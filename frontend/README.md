@@ -17,7 +17,7 @@ Modern React/TypeScript frontend for the EDGAR (Enrichment-Driven GrAph Reasoner
   - Interactive bar charts showing top results
   - Knowledge graph exploration
   - Analysis logs
-- **Job History**: Browse and reload previous analyses
+<!-- - **Job History**: Browse and reload previous analyses -->
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Tech Stack
@@ -68,15 +68,14 @@ npm run preview
 ## Usage
 
 ### Login
-
+<!-- 
 Use the demo credentials:
 - Username: `demo`
-- Password: `demo`
+- Password: `demo` -->
 
 ### Submit a Query
 
-1. Select a use case (e.g., Drug Repurposing)
-2. Enter an entity ID in CURIE format (e.g., `MONDO:0005148` for Type 2 Diabetes)
+1. Select a use case (e.g., Drug Repurposing) OR Enter an entity ID in CURIE format (e.g., `MONDO:0005148` for Type 2 Diabetes)
 3. Adjust advanced parameters if needed:
    - P-value threshold (default: 1e-5)
    - Maximum results (default: 100)
@@ -84,7 +83,6 @@ Use the demo credentials:
 
 ### Monitor Progress
 
-- Real-time progress updates via WebSocket
 - Status indicators: Queued → Running → Completed/Failed
 - Progress bar during analysis
 
@@ -92,7 +90,7 @@ Use the demo credentials:
 
 Once complete, explore:
 - **Overview**: Summary statistics and query graph
-- **Top Results**: Interactive chart and detailed list of ranked results
+- **Results**: Interactive chart and detailed list of ranked results
 - **Knowledge Graph**: Explore nodes and edges
 - **Logs**: Analysis execution logs
 
@@ -110,7 +108,7 @@ The API base URL is configured in `src/utils/api.ts`:
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 ```
 
-Update this if your backend is running on a different address.
+Update this if backend is running on a different address.
 
 ## Project Structure
 
@@ -176,33 +174,12 @@ const USE_CASES: UseCase[] = [
   {
     id: 'custom_case',
     name: 'Custom Analysis',
-    description: 'Your description',
-    subjectCategory: 'biolink:YourCategory',
+    description: 'Description',
+    subjectCategory: 'biolink:SubjectCategory',
     objectCategory: 'biolink:TargetCategory',
-    predicates: ['biolink:your_predicate'],
+    predicates: ['biolink:predicate'],
   },
   // ...
 ];
 ```
 
-## Troubleshooting
-
-### CORS Issues
-
-If you encounter CORS errors, ensure the backend's `CORS_ORIGINS` setting includes your frontend URL (default: `http://localhost:5173`).
-
-### Authentication Errors
-
-- Check that the backend is running
-- Verify credentials (default: demo/demo)
-- Clear localStorage: `localStorage.clear()` in browser console
-
-### WebSocket Connection Failures
-
-- Verify backend WebSocket endpoint is accessible
-- Check browser console for connection errors
-- The app will fall back to polling automatically
-
-## License
-
-This project is part of the EDGAR platform for biomedical knowledge graph analysis.
