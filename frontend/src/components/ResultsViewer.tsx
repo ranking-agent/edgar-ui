@@ -809,7 +809,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                     queryGraph={queryGraph}
                     auxiliaryGraphs={auxiliaryGraphs}
                     resultIndex={resultIdx}
-                    lookupSetMembers={lookupNodes}
+                    allResults={results.message.results}
                   />
                 )}
               </ErrorBoundary>
