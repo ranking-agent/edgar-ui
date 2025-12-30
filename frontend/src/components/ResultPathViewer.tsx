@@ -545,7 +545,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
                     console.log('Cytoscape initialized with', cy.elements().length, 'elements');
                     cy.userZoomingEnabled(false);
                     cy.on('tap', 'node, edge', handleElementClick);
-                    cy.on('tap', (event) => {
+                    cy.on('tap', (event: any) => {
                       if (event.target === cy) {
                         setSelectedElement(null);
                       }

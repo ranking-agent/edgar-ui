@@ -5,7 +5,6 @@ import { ResultPathViewer } from './ResultPathViewer';
 import { AC_URL, PREDICATES, NODE_CATEGORIES, COMMON_CHEMICALS, COMMON_DISEASES, COMMON_GENES, COMMON_PHENOTYPES } from '../utils/api';
 
 
-
 interface EnrichmentQuery {
   inputCategory: string;
   outputCategory: string;
@@ -788,7 +787,7 @@ export const EnrichmentAnalysis: React.FC = () => {
                                 const auxGraph = results.message?.auxiliary_graphs?.[sgId];
                                 if (!auxGraph?.edges) return;
                                 
-                                let memberId: string | null = null;
+                                let memberId: string = '';
                                 let memberName = '';
                                 let memberCategory = '';
                                 let pValue: number | undefined;
@@ -798,8 +797,10 @@ export const EnrichmentAnalysis: React.FC = () => {
                                   if (!auxEdge) return;
                                   
                                   if (auxEdge.predicate === 'biolink:member_of') {
-                                    memberId = auxEdge.subject;
-                                    const memberNode = results.message?.knowledge_graph?.nodes?.[memberId];
+                                    if (auxEdge.subject) {
+                                      memberId = auxEdge.subject;
+                                    }
+                                    const memberNode = memberId ? results.message?.knowledge_graph?.nodes?.[memberId] : undefined;
                                     memberName = memberNode?.name || memberId;
                                     memberCategory = memberNode?.categories?.[0]?.replace('biolink:', '') || 'Entity';
                                   } else {
@@ -825,7 +826,8 @@ export const EnrichmentAnalysis: React.FC = () => {
                               connectedMembers.forEach(m => {
                                 categoryCount[m.category] = (categoryCount[m.category] || 0) + 1;
                               });
-                              const mostCommonCategory = Object.entries(categoryCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Entity';
+                              const sortedCategories = Object.entries(categoryCount).sort((a, b) => b[1] - a[1]);
+                              const mostCommonCategory = sortedCategories.length > 0 ? sortedCategories[0][0] : 'Entity';
                               
                               let memberTypeLabel = mostCommonCategory + 's';
                               if (connectedMembers.length === 1) {

@@ -446,7 +446,7 @@ export const KnowledgeGraphViewer: React.FC<KnowledgeGraphViewerProps> = ({
                 cy={(cy) => {
                   cyRef.current = cy;
                   cy.on('tap', 'node, edge', handleElementClick);
-                  cy.on('tap', (event) => {
+                  cy.on('tap', (event: any) => {
                     if (event.target === cy) {
                       setSelectedElement(null);
                     }

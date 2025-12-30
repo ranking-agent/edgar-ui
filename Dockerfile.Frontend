@@ -59,7 +59,7 @@ server {
 EOF
 
 # Copy built files from builder
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Fix permissions for nginx to run as non-root
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
