@@ -1,4 +1,4 @@
-# Backend Dockerfile for EDGAR FastAPI
+# edgar/Dockerfile.backend
 FROM python:3.11-slim
 
 WORKDIR /app
