@@ -118,7 +118,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Full-width results list - Shows filtered results when rule selected, all results otherwise */}
-      {resultsData && (
+      {/* {resultsData && (
         selectedRuleKey ? (
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="mb-4 flex items-center justify-between">
@@ -150,7 +150,7 @@ export const Dashboard: React.FC = () => {
         ) : (
           <ResultsList results={resultsData} />
         )
-      )}
+      )} */}
     </div>
   );
 };

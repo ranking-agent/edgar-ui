@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { enrichmentAPI } from '../utils/api';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
-import { SingleResultDisplay } from './SingleResultDisplay';
 import { ResultPathViewer } from './ResultPathViewer';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -85,6 +84,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
   const [resultViewModes, setResultViewModes] = useState<Map<number, 'paths' | 'graph'>>(new Map());
   const [showAllResults, setShowAllResults] = useState(false);
   const [expandedRuleMembers, setExpandedRuleMembers] = useState<string | null>(null);
+  const [expandedSupportGraphs, setExpandedSupportGraphs] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -127,6 +127,14 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const newModes = new Map(resultViewModes);
     newModes.set(index, mode);
     setResultViewModes(newModes);
+  };
+
+  const toggleSupportGraph = (sgId: string) => {
+    setExpandedSupportGraphs(prev => {
+      const newMap = new Map(prev);
+      newMap.set(sgId, !newMap.get(sgId));
+      return newMap;
+    });
   };
 
   if (loading) {
@@ -385,6 +393,240 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
 
   const totalResults = results.message.results?.length || 0;
 
+  // Helper to get all query node IDs for path rendering
+  const allQueryNodeIds = Array.from(queryInputIds);
+
+  const renderSupportGraphText = (sgId: string, resultIdx: number) => {
+    const auxGraph = auxiliaryGraphs?.[sgId];
+    if (!auxGraph) return null;
+
+    const edges = auxGraph.edges || [];
+    if (edges.length !== 3) return null;
+
+    // Find the three edges
+    let inputToLookupEdge: any = null;
+    let lookupToEnrichmentEdge: any = null;
+    let resultToEnrichmentEdge: any = null;
+    let inputNodeids: any = null;
+    let enrichmentNodeids: any = null;
+    let resultNodeIds: any = null;
+
+    edges.forEach((edgeId: string) => {
+      const edge = knowledgeGraph?.edges[edgeId];
+      if (!edge) return;
+
+      // Input to Lookup Set
+      if (
+        (queryInputIds.has(edge.subject) && edge.object?.startsWith("uuid:")) ||
+        (queryInputIds.has(edge.object) && edge.subject?.startsWith("uuid:"))
+      ) {
+        inputToLookupEdge = edge;
+        inputNodeids = queryInputIds.has(edge.subject) ? edge.subject : edge.object;
+      }
+      // Lookup Set to Enrichment
+      else if ((edge.object?.startsWith('uuid:') && edge.attributes?.some((attr: any) => 
+        attr.attribute_type_id === 'biolink:support_graphs' && Array.isArray(attr.value)
+      )) || (edge.subject?.startsWith('uuid:') && edge.attributes?.some((attr: any) => 
+        attr.attribute_type_id === 'biolink:support_graphs' && Array.isArray(attr.value)
+      ))) {
+        lookupToEnrichmentEdge = edge;
+        enrichmentNodeids = edge.object?.startsWith('uuid:') ? edge.subject : edge.object;
+      }
+      // Result to Enrichment
+      else if (!queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') &&
+               !queryInputIds.has(edge.object) && !edge.object?.startsWith('uuid:')) {
+        resultToEnrichmentEdge = edge;
+        resultNodeIds = !queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') 
+          ? edge.subject 
+          : edge.object;
+      }
+    });
+
+    const missingEdges = [
+      !inputToLookupEdge && "input-to-lookup",
+      !lookupToEnrichmentEdge && "lookup-to-enrichment",
+      !resultToEnrichmentEdge && "result-to-enrichment",
+    ].filter(Boolean) as string[];
+    
+    if (missingEdges.length) {
+      return (
+        <div key={sgId} className="bg-white border-2 border-gray-200 rounded-lg p-3">
+          <div className="text-sm text-red-600">
+            Unable to parse support graph structure. Missing: {missingEdges.join(", ")} edge(s)
+          </div>
+        </div>
+      );
+    }
+    
+    // Get node information
+    const inputNode = knowledgeGraph?.nodes[inputNodeids];
+    const enrichmentNode = knowledgeGraph?.nodes[enrichmentNodeids];
+    const resultNode = knowledgeGraph?.nodes[resultNodeIds];
+
+    // Get connected members
+    const nestedSupportGraphsAttr = lookupToEnrichmentEdge.attributes?.find(
+      (attr: any) => attr.attribute_type_id === 'biolink:support_graphs'
+    );
+    const nestedSupportGraphIds = nestedSupportGraphsAttr?.value || [];
+    
+    const connectedMembers: Array<{id: string, name: string, pValue: number, category: string}> = [];
+    nestedSupportGraphIds.forEach((nestedSgId: string) => {
+      const nestedAuxGraph = auxiliaryGraphs?.[nestedSgId];
+      if (!nestedAuxGraph?.edges) return;
+
+      let memberId: string | null = null;
+      let pValue: number | null = null;
+
+      nestedAuxGraph.edges.forEach((nestedEdgeId: string) => {
+        const nestedEdge = knowledgeGraph?.edges[nestedEdgeId];
+        if (!nestedEdge) return;
+
+        const pValueAttr = nestedEdge.attributes?.find(
+          (attr: any) => attr.attribute_type_id === 'biolink:p_value'
+        );
+        if (pValueAttr?.value) {
+          pValue = pValueAttr.value;
+        }
+
+        if (nestedEdge.predicate === 'biolink:member_of') {
+          memberId = nestedEdge.subject;
+        }
+      });
+
+      if (memberId && pValue !== null) {
+        const memberNode = knowledgeGraph?.nodes[memberId];
+        const primaryCategory = memberNode?.categories?.[0]?.replace('biolink:', '') || 'Entity';
+        connectedMembers.push({
+          id: memberId,
+          name: memberNode?.name || memberId,
+          pValue: pValue,
+          category: primaryCategory
+        });
+      }
+    });
+
+    // Determine member type label
+    const categoryCount: Record<string, number> = {};
+    connectedMembers.forEach(member => {
+      categoryCount[member.category] = (categoryCount[member.category] || 0) + 1;
+    });
+    
+    let memberTypeLabel = 'members';
+    if (Object.keys(categoryCount).length > 0) {
+      const mostCommonCategory = Object.entries(categoryCount)
+        .sort((a, b) => b[1] - a[1])[0][0];
+      
+      const count = connectedMembers.length;
+      if (count === 1) {
+        memberTypeLabel = mostCommonCategory;
+      } else {
+        if (mostCommonCategory.endsWith('y')) {
+          memberTypeLabel = mostCommonCategory.slice(0, -1) + 'ies';
+        } else if (mostCommonCategory.endsWith('s') || mostCommonCategory.endsWith('x') || 
+                   mostCommonCategory.endsWith('ch') || mostCommonCategory.endsWith('sh')) {
+          memberTypeLabel = mostCommonCategory + 'es';
+        } else {
+          memberTypeLabel = mostCommonCategory + 's';
+        }
+      }
+    }
+
+    const expandKey = `${resultIdx}-${sgId}`;
+    const isExpanded = expandedSupportGraphs.get(expandKey) || false;
+
+    const pred1 = inputToLookupEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
+    const pred2 = lookupToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
+    const pred3 = resultToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
+
+    return (
+      <div key={sgId} className="bg-white border-2 border-gray-200 rounded-lg p-3">
+        <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-3">
+          <div className="flex items-center gap-3 text-sm flex-wrap">
+            <span className="inline-flex items-center bg-yellow-100 border border-yellow-400 px-2 py-1 rounded font-semibold">
+              {inputNode?.name || inputNodeids}
+            </span>
+            
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred1}</span>
+              <div className="flex items-center" style={{ width: '100%' }}>
+                <div className="flex-1 border-t-2 border-purple-600"></div>
+                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSupportGraph(expandKey);
+              }}
+              className="inline-flex items-center bg-green-100 border border-green-400 px-2 py-1 rounded font-semibold hover:bg-green-200 transition-colors"
+            >
+              {connectedMembers.length} {memberTypeLabel}
+            </button>
+            
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred2}</span>
+              <div className="flex items-center" style={{ width: '100%' }}>
+                <div className="flex-1 border-t-2 border-purple-600"></div>
+                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+              </div>
+            </div>
+            
+            <span className="inline-flex items-center bg-blue-100 border border-blue-400 px-2 py-1 rounded font-semibold">
+              {enrichmentNode?.name || enrichmentNodeids}
+            </span>
+            
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred3}</span>
+              <div className="flex items-center" style={{ width: '100%' }}>
+                <div className="flex-1 border-t-2 border-purple-600"></div>
+                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+              </div>
+            </div>
+            
+            <span className="inline-flex items-center bg-indigo-100 border border-indigo-400 px-2 py-1 rounded font-semibold">
+              {resultNode?.name || resultNodeIds}
+            </span>
+          </div>
+        </div>
+
+        {isExpanded && connectedMembers.length > 0 && (
+          <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3">
+            <div className="text-xs text-green-700 font-semibold mb-2">
+              Connected {memberTypeLabel.charAt(0).toUpperCase() + memberTypeLabel.slice(1)} ({connectedMembers.length})
+            </div>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {connectedMembers
+                .sort((a, b) => a.pValue - b.pValue)
+                .map((member, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-white border border-green-200 rounded p-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs font-semibold text-gray-900 truncate">
+                          {member.name}
+                        </div>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex-shrink-0">
+                          {member.category}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono truncate">
+                        {member.id}
+                      </div>
+                    </div>
+                    <div className="ml-2 text-xs font-mono text-green-700 font-semibold">
+                      p={member.pValue.toExponential(2)}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderExpandableResult = (resultIdx: number) => {
     const result = results.message.results[resultIdx];
     if (!result) return null;
@@ -474,12 +716,92 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
             <div className="p-4">
               <ErrorBoundary>
                 {viewMode === 'paths' ? (
-                  <SingleResultDisplay
-                    result={result}
-                    knowledgeGraph={knowledgeGraph}
-                    queryGraph={queryGraph}
-                    auxiliaryGraphs={auxiliaryGraphs}
-                  />
+                  /* Show Paths using renderSupportGraphText */
+                  (() => {
+                    const edgeBindings = result.analyses?.[0]?.edge_bindings || {};
+                    const firstEdgeBindingKey = Object.keys(edgeBindings)[0];
+                    const edgeId = firstEdgeBindingKey ? edgeBindings[firstEdgeBindingKey]?.[0]?.id : undefined;
+
+                    if (!edgeId) {
+                      return (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                          No edge binding found for this result
+                        </div>
+                      );
+                    }
+
+                    const edge = knowledgeGraph?.edges?.[edgeId];
+                    if (!edge) {
+                      return (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                          Edge not found: {edgeId}
+                        </div>
+                      );
+                    }
+
+                    const supportGraphAttrs = edge.attributes?.filter(
+                      (attr: any) => attr.attribute_type_id === 'biolink:support_graphs'
+                    ) || [];
+                    
+                    const supportGraphs = supportGraphAttrs.flatMap((attr: any) =>
+                      Array.isArray(attr.value) ? attr.value : [attr.value]
+                    ).filter(Boolean);
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Inferred Edge */}
+                        {/* <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                          <div className="font-semibold text-blue-900 mb-3 text-base">
+                            Inferred Edge
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Subject:</span>
+                              <span className="text-sm text-gray-900">
+                                {knowledgeGraph?.nodes[edge.subject]?.name || edge.subject}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Predicate:</span>
+                              <span className="text-sm font-semibold text-purple-700">
+                                {edge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'N/A'}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Object:</span>
+                              <span className="text-sm text-gray-900">
+                                {knowledgeGraph?.nodes[edge.object]?.name || edge.object}
+                              </span>
+                            </div>
+                          </div>
+                        </div> */}
+
+                        {/* Indirect Paths */}
+                        {supportGraphs.length > 0 ? (
+                          <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                            <div className="font-semibold text-green-900 mb-3 text-base">
+                              Inference Paths ({supportGraphs.length})
+                            </div>
+                            <div className="space-y-3">
+                              {supportGraphs.map((sgId: string, sgIdx: number) => 
+                                renderSupportGraphText(sgId, resultIdx) || (
+                                  <div key={sgIdx} className="text-sm text-gray-500">
+                                    Indirect path {sgId} not found
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-4">
+                            <div className="text-sm text-gray-600 text-center">
+                              No indirect paths found for this edge
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <ResultPathViewer
                     result={result}
@@ -501,26 +823,60 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
   return (
     <div className="bg-white rounded-xl shadow-lg">
       <div className="p-6 space-y-6">
-        {/* Stats - Consistent styling with chips */}
+        {/* Stats - Clickable cards replace tabs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Lookup Results - White with border (like NodeChip) */}
-          <div className="bg-white border-2 border-green-300 rounded-lg p-4 hover:bg-green-50 transition-colors">
+          {/* Lookup Results - Clickable */}
+          <button
+            onClick={() => {
+              setActiveTab('direct');
+              setSelectedRule(null);
+              onTabChange?.('direct');
+            }}
+            className={`text-left border-2 rounded-lg p-4 transition-all ${
+              activeTab === 'direct'
+                ? 'bg-green-50 border-green-500 shadow-md'
+                : 'bg-white border-green-300 hover:bg-green-50'
+            }`}
+          >
             <div className="text-sm text-green-700 font-semibold mb-1">Lookup Results</div>
             <div className="text-3xl font-bold text-green-900">{lookupNodes.length}</div>
-          </div>
+          </button>
           
-          {/* Inferred Results - Blue */}
-          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4 hover:bg-purple-100 transition-colors">
+          {/* Inferred Results - Clickable to show all results */}
+          <button
+            onClick={() => {
+              setActiveTab('inferred');
+              setSelectedRule(null);
+              setShowAllResults(true);
+              onTabChange?.('inferred');
+            }}
+            className={`text-left border-2 rounded-lg p-4 transition-all ${
+              activeTab === 'inferred' && showAllResults
+                ? 'bg-purple-100 border-purple-500 shadow-md'
+                : 'bg-purple-50 border-purple-300 hover:bg-purple-100'
+            }`}
+          >
             <div className="text-sm text-purple-700 font-semibold mb-1">Inferred Results</div>
             <div className="text-3xl font-bold text-purple-900">{totalResults}</div>
-          </div>
+          </button>
           
-          
-          {/* Enrichment Rules - Purple (like EdgeChip) */}
-          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 hover:bg-blue-100 transition-colors">
-            <div className="text-sm text-blue-700 font-semibold mb-1">Enrichment Rules</div>
+          {/* Enrichment--Inference Rules - Clickable */}
+          <button
+            onClick={() => {
+              setActiveTab('inferred');
+              setSelectedRule(null);
+              setShowAllResults(false);
+              onTabChange?.('inferred');
+            }}
+            className={`text-left border-2 rounded-lg p-4 transition-all ${
+              activeTab === 'inferred' && !showAllResults
+                ? 'bg-blue-100 border-blue-500 shadow-md'
+                : 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+            }`}
+          >
+            <div className="text-sm text-blue-700 font-semibold mb-1">Enrichment--Inference Rules</div>
             <div className="text-3xl font-bold text-blue-900">{sortedRules.length}</div>
-          </div>
+          </button>
           
           {/* Download Button */}
           <div className="flex items-center">
@@ -530,38 +886,6 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
             >
               <Download className="w-5 h-5" />
               Download
-            </button>
-          </div>
-        </div>
-
-        {/* Main Tabs */}
-        <div className="border-b-2 border-gray-200">
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setActiveTab('direct');
-                setSelectedRule(null);
-              }}
-              className={`px-6 py-3 border-b-2 font-semibold transition-colors ${
-                activeTab === 'direct'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Direct ({lookupNodes.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('inferred');
-                setSelectedRule(null);
-              }}
-              className={`px-6 py-3 border-b-2 font-semibold transition-colors ${
-                activeTab === 'inferred'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Inferrence Rules ({sortedRules.length})
             </button>
           </div>
         </div>
@@ -606,7 +930,19 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                 )}
               </div>
             </div>
+          ) : showAllResults ? (
+            /* Show All Inferred Results */
+            <div className="space-y-3">
+              <div className="mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">All Inferred Results</h3>
+                <p className="text-sm text-gray-600">
+                  {totalResults} results • Click to expand and view paths or graph
+                </p>
+              </div>
+              {Array.from({ length: totalResults }, (_, idx) => renderExpandableResult(idx))}
+            </div>
           ) : (
+            /* Show Enrichment Rules */
             <div className="h-[400px] flex flex-col">
               <div className="mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -698,6 +1034,25 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
             </div>
           )}
         </div>
+
+        {/* Results Display - Shows when a rule is selected */}
+        {activeTab === 'inferred' && !showAllResults && selectedRule && (
+          <div className="space-y-3 pt-4 border-t-2 border-gray-200">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Results for Selected Rule
+              </h3>
+              <p className="text-sm text-gray-600">
+                {enrichmentRulesMap.get(selectedRule)?.count || 0} result{enrichmentRulesMap.get(selectedRule)?.count !== 1 ? 's' : ''} • Click to expand and view paths or graph
+              </p>
+            </div>
+            <div className="space-y-3">
+              {enrichmentRulesMap.get(selectedRule)?.resultIndices.map((resultIdx) => 
+                renderExpandableResult(resultIdx)
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

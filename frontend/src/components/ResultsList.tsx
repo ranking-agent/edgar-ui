@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Network, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { ResultPathViewer } from './ResultPathViewer';
 
 interface ResultsListProps {
@@ -462,7 +462,7 @@ export const ResultsList: React.FC<ResultsListProps> = ({ results }) => {
                       return (
                         <>
                           {/* Inferred Edge Card */}
-                          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                          {/* <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
                             <div className="font-semibold text-blue-900 mb-3 text-base">
                               Inferred Edge
                             </div>
@@ -492,13 +492,13 @@ export const ResultsList: React.FC<ResultsListProps> = ({ results }) => {
                                 </span>
                               </div>
                             </div>
-                          </div>
+                          </div> */}
 
                           {/* Indirect Paths */}
                           {supportGraphs.length > 0 ? (
                             <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
                               <div className="font-semibold text-green-900 mb-3 text-base">
-                                Indirect Paths ({supportGraphs.length})
+                                Inference Paths ({supportGraphs.length})
                               </div>
                               <div className="space-y-3">
                                 {supportGraphs.map((sgId: string, sgIdx: number) => 

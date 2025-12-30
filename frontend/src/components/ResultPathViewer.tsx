@@ -7,7 +7,7 @@ import klay from 'cytoscape-klay';
 import dagre from 'cytoscape-dagre';
 // @ts-ignore
 import avsdf from 'cytoscape-avsdf';
-import { Download, ZoomIn, ZoomOut, Maximize2, Network } from 'lucide-react';
+import { Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 // import { useMargin } from 'recharts';
 
 Cytoscape.use(klay);
@@ -93,21 +93,21 @@ const layoutList = {
 
 type LayoutKey = keyof typeof layoutList;
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'biolink:Disease': '#e74c3c',
-  'biolink:Drug': '#3498db',
-  'biolink:ChemicalEntity': '#9b59b6',
-  'biolink:SmallMolecule': '#8e44ad',
-  'biolink:Gene': '#2ecc71',
-  'biolink:Protein': '#1abc9c',
-  'biolink:BiologicalProcess': '#f39c12',
-  'biolink:MolecularActivity': '#d35400',
-  'biolink:CellularComponent': '#16a085',
-  'biolink:Pathway': '#e67e22',
-  'biolink:Phenotype': '#95a5a6',
-  'biolink:PhenotypicFeature': '#95a5a6',
-  'biolink:AnatomicalEntity': '#34495e',
-};
+// const CATEGORY_COLORS: Record<string, string> = {
+//   'biolink:Disease': '#e74c3c',
+//   'biolink:Drug': '#3498db',
+//   'biolink:ChemicalEntity': '#9b59b6',
+//   'biolink:SmallMolecule': '#8e44ad',
+//   'biolink:Gene': '#2ecc71',
+//   'biolink:Protein': '#1abc9c',
+//   'biolink:BiologicalProcess': '#f39c12',
+//   'biolink:MolecularActivity': '#d35400',
+//   'biolink:CellularComponent': '#16a085',
+//   'biolink:Pathway': '#e67e22',
+//   'biolink:Phenotype': '#95a5a6',
+//   'biolink:PhenotypicFeature': '#95a5a6',
+//   'biolink:AnatomicalEntity': '#34495e',
+// };
 
 const DEFAULT_COLOR = '#7f8c8d';
 
@@ -132,6 +132,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
   allResults = [], // NEW: Default to empty array
 }) => {
   const cyRef = useRef<any>(null);
+  const hasInitialized = useRef(false);
   const [elements, setElements] = useState<any[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [currentLayout, setCurrentLayout] = useState<LayoutKey>('preset');
@@ -215,81 +216,50 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
   useEffect(() => {
     const cyElements = convertToCytoscapeFormat(resultSubgraph);
     setElements(cyElements);
+    hasInitialized.current = false;
+  }, [resultSubgraph]);
+
+  useEffect(() => {
+    if (!cyRef.current || elements.length === 0) return;
     
-    // Force render after elements are set AND run initial layout
-    if (cyRef.current && cyElements.length > 0) {
-      setTimeout(() => {
-        const cy = cyRef.current;
-        if (!cy) return;
+    const cy = cyRef.current;
+    
+    // Debounce to prevent rapid re-runs
+    const timeoutId = setTimeout(() => {
+      console.log(`Running layout: ${currentLayout}`);
+      
+      // Stop any running layouts
+      cy.stop();
+      
+      if (currentLayout === 'preset') {
+        console.log('Restoring preset positions');
+        elements.forEach(el => {
+          if (el.data.type === 'node' && el.position) {
+            const node = cy.getElementById(el.data.id);
+            if (node.length > 0) {
+              node.position(el.position);
+            }
+          }
+        });
         
-        console.log('Initial render: running preset layout with', cyElements.length, 'elements');
-        
-        // Stop any running layouts
-        cy.stop();
-        
-        // Run the current layout (preset by default)
+        cy.resize();
+        cy.fit(undefined, 50);
+        cy.center();
+      } else {
         const layout = cy.layout(layoutList[currentLayout]);
         layout.run();
         
         layout.one('layoutstop', () => {
-          console.log('Initial layout complete');
-          cy.resize();
           cy.fit(undefined, 50);
           cy.center();
         });
-      }, 150); // Increased delay to ensure Cytoscape is ready
-    }
-  }, [resultSubgraph]); // Only depends on data changes, not layout
-
-  useEffect(() => {
-    if (cyRef.current && elements.length > 0) {
-      // Add 50ms delay to ensure DOM is fully rendered
-      setTimeout(() => {
-        const cy = cyRef.current;
-        if (!cy) return;
-        
-        console.log(`Layout effect triggered: ${currentLayout}`);
-        
-        // Stop any running layouts first
-        cy.stop();
-        
-        cy.userZoomingEnabled(true);
-        
-        // Special handling for preset layout - manually restore positions
-        if (currentLayout === 'preset') {
-          console.log('Restoring preset positions from elements data');
-          
-          // Restore positions from elements array (which has our calculated positions)
-          elements.forEach(el => {
-            if (el.data.type === 'node' && el.position) {
-              const node = cy.getElementById(el.data.id);
-              if (node.length > 0) {
-                node.position(el.position);
-              }
-            }
-          });
-          
-          // Force render after restoring positions
-          setTimeout(() => {
-            cy.resize();
-            cy.fit(undefined, 50);
-            cy.center();
-          }, 50);
-        } else {
-          // For other layouts, run the layout algorithm
-          const layout = cy.layout(layoutList[currentLayout]);
-          
-          console.log(`Running layout: ${currentLayout}`);
-          
-          layout.run();
-          
-          layout.one('layoutstop', () => {
-            cy.fit(undefined, 50);
-          });
-        }
-      }, 50);
-    }
-  }, [currentLayout, layoutTrigger, elements]); // Also depend on elements to get position data
+      }
+      
+      hasInitialized.current = true;
+    }, 150); // Debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [currentLayout, layoutTrigger]); // REMOVED elements dependency!
 
   const handleElementClick = (event: any) => {
     const element = event.target;
@@ -348,7 +318,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
         'text-valign': 'center',
         'text-halign': 'center',
         'padding': '10px',
-        'font-size': '11px',
+        'font-size': '15px',
         'font-weight': 'bold',
         'color': '#000',
         'text-wrap': 'wrap',
@@ -409,7 +379,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
         'control-point-distances': [50], // Distance from edge midpoint
         'control-point-weights': [0.5], // Position along edge (0=source, 1=target)
         'label': 'data(label)',
-        'font-size': '9px',
+        'font-size': '15px',
         'text-rotation': 'autorotate',
         'text-margin-y': -10,
         'text-background-color': '#ffffff',
@@ -485,28 +455,11 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
           </div>
         )}
       </div>
-      <hr />
-      {/* Header with Title and Download */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <Network className="w-5 h-5 text-purple-600" />
-          <h4 className="text-lg font-semibold text-gray-900">
-            Result #{resultIndex + 1} Graph
-          </h4>
-        </div>
-
-        <button
-          onClick={handleDownloadPNG}
-          className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-        >
-          <Download className="w-4 h-4" />
-          PNG
-        </button>
-      </div>
-
+      
       {/* Scrollable Layout Buttons - ROBOKOP Style */}
       <div className="mb-3">
-        <div className="overflow-x-auto pb-2">
+        <div className="grid grid-cols-2 ">
+          {/* Left column - Layout buttons */}
           <div className="flex items-center gap-1 min-w-max">
             <span className="text-sm font-medium text-gray-700 whitespace-nowrap mr-1">Layout:</span>
             {(Object.keys(layoutList) as LayoutKey[]).map((key) => {
@@ -529,9 +482,17 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
               );
             })}
           </div>
+          {/* Right column - PNG button */}
+          <div className="flex justify-end items-center">
+            <button
+              onClick={handleDownloadPNG}
+              className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
+              <Download className="w-4 h-4" /> PNG
+            </button>
+          </div>
         </div>
       </div>
-      <hr />
+      {/* <hr /> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3">
@@ -635,7 +596,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
                       <div className="w-16 h-7 rounded bg-yellow-50 border-2 border-yellow-300 flex items-center justify-center">
                         <span className="text-[11px] text-black font-bold">Input</span>
                       </div>
-                      <span className="text-xs text-gray-700">Input Node</span>
+                      <span className="text-xs text-gray-700">Input Node(s)</span>
                     </div>
                   )}
                   {elements.some(el => el.data.nodeType === 'query') && (
