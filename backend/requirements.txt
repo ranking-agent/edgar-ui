@@ -19,3 +19,5 @@ slowapi==0.1.9
 # Development
 pytest==7.4.4
 pytest-asyncio==0.23.3
+
+pyjwt
