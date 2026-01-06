@@ -2,7 +2,7 @@ name: 'Build and Release Docker Images'
 
 on:
     push:
-        branches: [ main ]  # Builds on every push to main
+        branches: [ main, master ]
     release:
         types: [published]
 
@@ -13,6 +13,9 @@ jobs:
     push_to_registry:
         name: Push Docker images to GitHub Packages
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
         steps:
             - name: Check out the repo
               uses: actions/checkout@v3
