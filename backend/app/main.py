@@ -105,6 +105,10 @@ async def root():
         "description": "Enrichment-Driven link prediction for biomedical knowledge graphs"
     }
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Kubernetes probes."""
+    return {"status": "healthy"}
 
 # WebSocket connection manager
 class ConnectionManager:
