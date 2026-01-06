@@ -2,7 +2,7 @@ name: 'Build and Release Docker Images'
 
 on:
     push:
-        branches: [ main, master ]  # Builds on every push to main
+        branches: [ main ]  # Builds on every push to main
     release:
         types: [published]
 
