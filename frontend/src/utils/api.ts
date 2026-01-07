@@ -1,7 +1,16 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-export const AC_URL = 'https://answercoalesce.renci.org/query';
+
+const getApiBaseUrl = () => {
+  // In production (edgar-test.apps.renci.org), use same domain
+  if (window.location.hostname !== 'localhost') {
+    return `${window.location.protocol}//${window.location.host}/api/v1`;
+  }
+  // In development, use localhost
+  return 'http://localhost:8000/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 
 export const api = axios.create({
@@ -23,14 +32,10 @@ api.interceptors.request.use((config) => {
 // Auth API
 export const authAPI = {
   login: async (username: string, password: string) => {
-    const formData = new URLSearchParams();
-    formData.append('username', username);
-    formData.append('password', password);
-    
-    const response = await axios.post(`${API_BASE_URL}/auth/login`, formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    // Send JSON, not form data (to match your backend)
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+      username,
+      password,
     });
     return response.data;
   },
@@ -66,7 +71,16 @@ export const enrichmentAPI = {
 
 // WebSocket connection for job updates
 export const createJobWebSocket = (jobId: string, onMessage: (data: any) => void) => {
-  const ws = new WebSocket(`ws://localhost:8000/ws/job/${jobId}`);
+  // Dynamically determine WebSocket URL
+  const getWsUrl = () => {
+    if (window.location.hostname !== 'localhost') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${window.location.host}`;
+    }
+    return 'ws://localhost:8000';
+  };
+  
+  const ws = new WebSocket(`${getWsUrl()}/ws/job/${jobId}`);
   
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
@@ -76,6 +90,7 @@ export const createJobWebSocket = (jobId: string, onMessage: (data: any) => void
   return ws;
 };
 
+export const AC_URL = 'https://answercoalesce.renci.org/query';
 
 export const PREDICATES = ['biolink:treats', 'biolink:affects', 'biolink:regulates',
 'biolink:associated_with', 'biolink:active_in', 'biolink:actively_involved_in',
