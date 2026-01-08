@@ -1,40 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Info, Settings, ChevronDown, ChevronUp, SearchCode } from 'lucide-react';
+import { 
+  Search, 
+  Info, 
+  Settings2, 
+  ChevronDown, 
+  ChevronUp, 
+  Play,
+  Lightbulb,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import { enrichmentAPI, PREDICATES, NODE_CATEGORIES, ASPECT_QUALIFIERS, DIRECTION_QUALIFIERS } from '../utils/api';
 
 const EXAMPLE_QUERIES = [
   {
-    label: 'What Drugs treats Disease Y eg. MONDO:0004975?',
+    label: 'Drugs that treat a Disease',
+    description: 'e.g., MONDO:0004975 (Alzheimer disease)',
     value: 'biolink:Drug-biolink:treats-biolink:Disease',
     example: 'MONDO:0004975',
-    exampleIsTarget: true  // Disease is the TARGET of "treats"
+    exampleIsTarget: true
   },
   {
-    label: 'What Genes are genetically associated with Disease X eg. DOID:0050430?',
+    label: 'Genes associated with a Disease',
+    description: 'e.g., DOID:0050430 (Alzheimer disease)',
     value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
     example: 'DOID:0050430',
-    exampleIsTarget: true  // Disease is the TARGET
+    exampleIsTarget: true
   },
   {
-    label: 'What are the Phenotypes of Disease X eg. MONDO:0005147?',
+    label: 'Phenotypes of a Disease',
+    description: 'e.g., MONDO:0005147 (Type 1 diabetes)',
     value: 'biolink:Disease-biolink:has_phenotype-biolink:PhenotypicFeature',
     example: 'MONDO:0005147',
-    exampleIsTarget: false  // Disease is the SOURCE (subject)
+    exampleIsTarget: false
   },
   {
-    label: 'What are the Genes that affects Phenotype X eg. HP:0003637?',
+    label: 'Genes affecting a Phenotype',
+    description: 'e.g., HP:0003637 (Myasthenia)',
     value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
     example: 'HP:0003637',
-    exampleIsTarget: true  // Phenotype is the TARGET
+    exampleIsTarget: true
   },
   {
-    label: 'What are the Phenotypes of Gene X eg. NCBIGene:122481?',
+    label: 'Phenotypes of a Gene',
+    description: 'e.g., NCBIGene:122481',
     value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
     example: 'NCBIGene:122481',
-    exampleIsTarget: false  // Gene is the SOURCE (subject)
+    exampleIsTarget: false
   }
 ];
-
 
 interface QueryBuilderProps {
   onJobCreated: (jobId: string) => void;
@@ -55,6 +69,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [predicatesToExclude, setPredicatesToExclude] = useState('causes, biomarker_for, contraindicated_for, contraindicated_in, contributes_to, has_adverse_event, causes_adverse_event, treats_or_applied_or_studied_to_treat');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedExample, setSelectedExample] = useState<number | null>(null);
 
   const buildTrapiQuery = () => {
     const qualifierConstraints = [];
@@ -117,20 +132,19 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     resultLength,
   ]);
   
-  
-  const handleExampleQuery = (exampleValue: string, exampleId: string, exampleIsTarget: boolean) => {
+  const handleExampleQuery = (exampleValue: string, exampleId: string, exampleIsTarget: boolean, idx: number) => {
     const [source, pred, target] = exampleValue.split('-');
     setSourceCategory(source);
     setPredicate(pred);
     setTargetCategory(target);
+    setSelectedExample(idx);
     
-    // Set the CURIE in the correct position based on exampleIsTarget
     if (exampleIsTarget) {
-      setSourceId('');  // Clear source - we want to find what connects TO this target
-      setTargetId(exampleId);  // Example CURIE goes in target
+      setSourceId('');
+      setTargetId(exampleId);
     } else {
-      setSourceId(exampleId);  // Example CURIE goes in source
-      setTargetId('');  // Clear target - we want to find what this source connects TO
+      setSourceId(exampleId);
+      setTargetId('');
     }
   };
 
@@ -138,7 +152,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     e.preventDefault();
     setError('');
 
-    // Validation
     if ((!sourceId && !targetId) || (sourceId && targetId)) {
       setError('Please provide exactly ONE CURIE (either source OR target)');
       return;
@@ -158,7 +171,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     setLoading(true);
 
     try {
-      // Build qualifier constraints
       const qualifierConstraints = [];
       if (aspectQualifier || directionQualifier) {
         const qualifierSet = [];
@@ -177,7 +189,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
         qualifierConstraints.push({ qualifier_set: qualifierSet });
       }
 
-      // Build TRAPI query
       const query: any = {
         message: {
           query_graph: {
@@ -208,6 +219,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           }
         }
       };
+      
       if (onQueryPreview) {onQueryPreview(query);}
 
       // Add parameters if configured
@@ -228,57 +240,74 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
       const response = await enrichmentAPI.submitAnalysis(query);
       onJobCreated(response.job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit query');
+      console.error('Error submitting job:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to submit query');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <SearchCode className="w-6 h-6 text-blue-600" />
-        <h2 className="text-2xl font-bold text-gray-900">Build Query</h2>
-      </div>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Example Queries Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Example Query Patterns (Optional)
-          </label>
-          <select
-            onChange={(e) => {
-              const selected = EXAMPLE_QUERIES.find(q => q.value === e.target.value);
-              if (selected) {
-                handleExampleQuery(selected.value, selected.example, selected.exampleIsTarget);
-              }
-            }}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select an example query pattern...</option>
-            {EXAMPLE_QUERIES.map((query, idx) => (
-              <option key={`${query.value}-${idx}`} value={query.value}>
-                {query.label}
-              </option>
-            ))}
-          </select>
-        </div>
+  const formatCategoryName = (cat: string) => {
+    return cat.replace('biolink:', '').replace(/([A-Z])/g, ' $1').trim();
+  };
 
-        {/* Source Node */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Source Type
+  return (
+    <div className="space-y-6">
+      {/* Example Queries */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Lightbulb className="w-4 h-4 text-amber-500" />
+          <label className="text-sm font-semibold text-slate-700">
+            Quick Start Templates
+          </label>
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {EXAMPLE_QUERIES.map((query, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleExampleQuery(query.value, query.example, query.exampleIsTarget, idx)}
+              className={`
+                text-left px-4 py-3 rounded-xl border-2 transition-all duration-200
+                ${selectedExample === idx 
+                  ? 'border-purple-500 bg-purple-50 shadow-sm' 
+                  : 'border-slate-200 hover:border-purple-200 hover:bg-purple-50/50'
+                }
+              `}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`font-medium ${selectedExample === idx ? 'text-purple-700' : 'text-slate-700'}`}>
+                  {query.label}
+                </span>
+                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                  {query.example}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">{query.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-px bg-purple-100" />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Node Configuration */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Source Node */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <div className="w-2 h-2 rounded-full bg-violet-500" />
+              Source Node
             </label>
             <select
               value={sourceCategory}
               onChange={(e) => setSourceCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
             >
               {NODE_CATEGORIES.map((cat, idx) => (
                 <option key={`source-${cat}-${idx}`} value={cat}>
-                  {cat.replace('biolink:', '')}
+                  {formatCategoryName(cat)}
                 </option>
               ))}
             </select>
@@ -286,24 +315,25 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               type="text"
               value={sourceId}
               onChange={(e) => setSourceId(e.target.value)}
-              placeholder="Leave blank if this is the return node(s)..."
-              className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Leave blank to find sources..."
+              className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 font-mono text-sm"
             />
           </div>
 
           {/* Target Node */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Target Type
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <div className="w-2 h-2 rounded-full bg-fuchsia-500" />
+              Target Node
             </label>
             <select
               value={targetCategory}
               onChange={(e) => setTargetCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
             >
               {NODE_CATEGORIES.map((cat, idx) => (
                 <option key={`target-${cat}-${idx}`} value={cat}>
-                  {cat.replace('biolink:', '')}
+                  {formatCategoryName(cat)}
                 </option>
               ))}
             </select>
@@ -311,25 +341,26 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               type="text"
               value={targetId}
               onChange={(e) => setTargetId(e.target.value)}
-              placeholder="Leave blank if this is the return node(s)..."
-              className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Leave blank to find targets..."
+              className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 font-mono text-sm"
             />
           </div>
         </div>
 
         {/* Predicate */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Predicate
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <div className="w-6 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded" />
+            Relationship Predicate
           </label>
           <select
             value={predicate}
             onChange={(e) => setPredicate(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
           >
             {PREDICATES.map((pred, idx) => (
               <option key={`pred-${pred}-${idx}`} value={pred}>
-                {pred.replace('biolink:', '')}
+                {pred.replace('biolink:', '').replace(/_/g, ' ')}
               </option>
             ))}
           </select>
@@ -337,14 +368,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
 
         {/* Qualifiers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Object Aspect Qualifier (Optional)
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-600">
+              Aspect Qualifier <span className="text-slate-400">(optional)</span>
             </label>
             <select
               value={aspectQualifier}
               onChange={(e) => setAspectQualifier(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
             >
               <option value="">None</option>
               {ASPECT_QUALIFIERS.map((qual, idx) => (
@@ -355,14 +386,14 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Object Direction Qualifier (Optional)
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-600">
+              Direction Qualifier <span className="text-slate-400">(optional)</span>
             </label>
             <select
               value={directionQualifier}
               onChange={(e) => setDirectionQualifier(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
             >
               <option value="">None</option>
               {DIRECTION_QUALIFIERS.map((qual, idx) => (
@@ -374,83 +405,98 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           </div>
         </div>
 
-        {/* Parameters Section */}
-        <div className="border-t pt-4">
+        {/* Advanced Parameters Toggle */}
+        <div className="border-t border-purple-100 pt-4">
           <button
             type="button"
             onClick={() => setShowParameters(!showParameters)}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4"
+            className="flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium text-sm transition-colors"
           >
-            <Settings className="w-5 h-5" />
+            <Settings2 className="w-4 h-4" />
             Advanced Parameters
             {showParameters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
           {showParameters && (
-            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+            <div className="mt-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
                     P-value Threshold
                   </label>
                   <input
                     type="text"
                     value={pvalueThreshold}
                     onChange={(e) => setPvalueThreshold(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Result Length
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Max Results
                   </label>
                   <input
                     type="number"
                     value={resultLength}
                     onChange={(e) => setResultLength(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
                     min="1"
                     max="10000"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Predicates to Exclude (comma-separated)
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Predicates to Exclude
                 </label>
                 <textarea
                   value={predicatesToExclude}
                   onChange={(e) => setPredicatesToExclude(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                  placeholder="Comma-separated list of predicates..."
                 />
               </div>
             </div>
           )}
         </div>
 
+        {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {error}
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <span className="text-sm text-red-700">{error}</span>
           </div>
         )}
 
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
         >
-          <Search className="w-5 h-5" />
-          {loading ? 'Submitting Query...' : 'Run Enrichment Analysis'}
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Processing Query...
+            </>
+          ) : (
+            <>
+              <Play className="w-5 h-5" />
+              Run Enrichment Analysis
+            </>
+          )}
         </button>
       </form>
 
       {/* Help Text */}
-      <div className="mt-4 text-xs text-gray-500">
-        <Info className="inline w-4 h-4 mr-1" />
-        Provide exactly ONE CURIE (either source OR target). The other will be inferred.
+      <div className="flex items-start gap-2 px-4 py-3 bg-purple-50 rounded-xl border border-purple-100">
+        <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-purple-700">
+          Provide exactly <strong>one CURIE</strong> (either source or target). The system will infer the matching nodes.
+        </p>
       </div>
     </div>
   );

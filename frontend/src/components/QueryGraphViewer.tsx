@@ -6,29 +6,30 @@ import coseBilkent from 'cytoscape-cose-bilkent';
 import { Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { QueryGraph } from '../types';
 
-// Register the layout
 Cytoscape.use(coseBilkent);
 
 interface QueryGraphViewerProps {
   queryGraph: QueryGraph;
 }
 
-// Color scheme for biolink categories
+// Color scheme for biolink categories - Purple themed
 const CATEGORY_COLORS: Record<string, string> = {
-  'biolink:Disease': '#e74c3c',
-  'biolink:Drug': '#3498db',
-  'biolink:ChemicalEntity': '#9b59b6',
-  'biolink:Gene': '#2ecc71',
-  'biolink:Protein': '#1abc9c',
-  'biolink:BiologicalProcess': '#f39c12',
-  'biolink:Pathway': '#e67e22',
-  'biolink:Phenotype': '#95a5a6',
-  'biolink:AnatomicalEntity': '#34495e',
-  'biolink:CellularComponent': '#16a085',
-  'biolink:MolecularActivity': '#d35400',
+  'biolink:Disease': '#e11d48',
+  'biolink:Drug': '#7c3aed',
+  'biolink:ChemicalEntity': '#a855f7',
+  'biolink:SmallMolecule': '#8b5cf6',
+  'biolink:Gene': '#10b981',
+  'biolink:Protein': '#14b8a6',
+  'biolink:BiologicalProcess': '#f59e0b',
+  'biolink:Pathway': '#f97316',
+  'biolink:Phenotype': '#8b5cf6',
+  'biolink:PhenotypicFeature': '#8b5cf6',
+  'biolink:AnatomicalEntity': '#64748b',
+  'biolink:CellularComponent': '#06b6d4',
+  'biolink:MolecularActivity': '#ea580c',
 };
 
-const DEFAULT_COLOR = '#7f8c8d';
+const DEFAULT_COLOR = '#6366f1';
 
 export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }) => {
   const cyRef = useRef<any>(null);
@@ -36,13 +37,12 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [presentCategories, setPresentCategories] = useState<string[]>([]);
 
-  // Extract and sort unique categories present in the graph
   useEffect(() => {
     const categories = Array.from(
       new Set(
         Object.values(queryGraph.nodes)
           .flatMap(node => node.categories || [])
-          .filter(Boolean) // remove empty strings or nulls
+          .filter(Boolean)
       )
     ).sort();
 
@@ -57,19 +57,15 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
   const convertToCytoscapeFormat = (qg: QueryGraph) => {
     const elements: any[] = [];
 
-    // Add nodes
     Object.entries(qg.nodes).forEach(([nodeId, node]) => {
       const primaryCategory = node.categories?.[0] || 'biolink:NamedThing';
       const color = CATEGORY_COLORS[primaryCategory] || DEFAULT_COLOR;
       
-      // Create label
       let label = nodeId;
       if (node.ids && node.ids.length > 0) {
-        // If node has specific IDs, show first ID
         const firstId = node.ids[0];
         label = firstId.includes(':') ? firstId : firstId;
       } else if (node.categories && node.categories.length > 0) {
-        // Otherwise show primary category
         label = primaryCategory.replace('biolink:', '');
       }
 
@@ -87,7 +83,6 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
       });
     });
 
-    // Add edges
     Object.entries(qg.edges).forEach(([edgeId, edge]) => {
       const predicateLabel = edge.predicates?.[0]
         ? edge.predicates[0].replace('biolink:', '')
@@ -121,7 +116,7 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
   const handleZoomIn = () => {
     if (cyRef.current) {
       const cy = cyRef.current;
-      cy.zoom(cy.zoom() * 1.2);
+      cy.zoom(cy.zoom() * 1.4);
       cy.center();
     }
   };
@@ -129,20 +124,20 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
   const handleZoomOut = () => {
     if (cyRef.current) {
       const cy = cyRef.current;
-      cy.zoom(cy.zoom() * 0.8);
+      cy.zoom(cy.zoom() * 0.6);
       cy.center();
     }
   };
 
   const handleFit = () => {
     if (cyRef.current) {
-      cyRef.current.fit();
+      cyRef.current.fit(undefined, 60);
     }
   };
 
   const handleDownloadPNG = () => {
     if (cyRef.current) {
-      const png = cyRef.current.png({ full: true, scale: 2 });
+      const png = cyRef.current.png({ full: true, scale: 3 });
       const link = document.createElement('a');
       link.href = png;
       link.download = 'query-graph.png';
@@ -150,119 +145,115 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
     }
   };
 
+  // MUCH LARGER NODE AND EDGE STYLING
   const cytoscapeStylesheet: any[] = [
     {
       selector: 'node',
       style: {
         'background-color': 'data(color)',
         'label': 'data(label)',
-        'width': '80px',
-        'height': '80px',
+        'width': '160px',         // INCREASED from 80px
+        'height': '160px',        // INCREASED from 80px
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': '18px',      // INCREASED from 12px
         'font-weight': 'bold',
         'color': '#ffffff',
-        // 'text-outline-width': 0,
+        'text-outline-width': 3,
         'text-outline-color': 'data(color)',
-        'border-width': 3,
+        'border-width': 5,        // INCREASED from 3
         'border-color': '#ffffff',
-        // 'overlay-padding': '4px',
+        'text-wrap': 'wrap',
+        'text-max-width': '140px',
       },
     },
     {
       selector: 'node[isSet]',
       style: {
-        'shape': 'round',
-        // 'border-width': 4,
+        'shape': 'round-rectangle',
         'border-style': 'dashed',
+        'border-width': 6,
       },
     },
     {
       selector: 'node:selected',
       style: {
-        'border-width': 5,
-        // 'border-color': '#f39c12',
-        'overlay-opacity': 0.3,
-        // 'overlay-color': '#f39c12',
+        'border-width': 7,
+        'border-color': '#fbbf24',
+        'overlay-opacity': 0.2,
+        'overlay-color': '#fbbf24',
       },
     },
     {
       selector: 'edge',
       style: {
-        'width': 4,
-        'line-color': '#95a5a6',
-        'target-arrow-color': '#95a5a6',
+        'width': 6,               // INCREASED from 4
+        'line-color': '#94a3b8',
+        'target-arrow-color': '#94a3b8',
         'target-arrow-shape': 'triangle',
+        'arrow-scale': 2.0,       // INCREASED
         'curve-style': 'bezier',
         'label': 'data(label)',
-        'font-size': '11px',
+        'font-size': '16px',      // INCREASED from 11px
         'text-rotation': 'autorotate',
-        'text-margin-y': -10,
-        'color': '#2c3e50',
+        'text-margin-y': -14,
+        'color': '#1e293b',
         'text-background-color': '#ffffff',
-        'text-background-opacity': 0.8,
-        // 'text-background-padding': '1px',
+        'text-background-opacity': 0.9,
+        'text-background-padding': '5px',
+        'font-weight': '600',
       },
     },
     {
       selector: 'edge:selected',
       style: {
-        'width': 6,
-        'line-color': '#f39c12',
-        'target-arrow-color': '#f39c12',
+        'width': 8,
+        'line-color': '#a855f7',
+        'target-arrow-color': '#a855f7',
       },
     },
   ];
 
   const layout = {
     name: 'breadthfirst',
-    quality: 'proof',
-    nodeDimensionsIncludeLabels: true,
+    directed: true,
+    padding: 100,             // INCREASED
+    spacingFactor: 2.5,       // INCREASED
     animate: true,
-    animationDuration: 1000,
+    animationDuration: 800,
     fit: true,
-    padding: 50,
-    nodeRepulsion: 8000,
-    idealEdgeLength: 150,
-    edgeElasticity: 0.45,
-    nestingFactor: 0.1,
-    gravity: 0.25,
-    numIter: 2500,
-    tile: true,
-    tilingPaddingVertical: 10,
-    tilingPaddingHorizontal: 10,
+    avoidOverlap: true,
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold text-gray-900">Query Graph Structure</h4>
+        <h4 className="text-lg font-semibold text-slate-900">Query Graph Structure</h4>
         <div className="flex items-center gap-2">
           <button
             onClick={handleZoomIn}
-            className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="p-2.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-4 h-4 text-gray-700" />
+            <ZoomIn className="w-5 h-5 text-purple-700" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="p-2.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-4 h-4 text-gray-700" />
+            <ZoomOut className="w-5 h-5 text-purple-700" />
           </button>
           <button
             onClick={handleFit}
-            className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="p-2.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors"
             title="Fit to Screen"
           >
-            <Maximize2 className="w-4 h-4 text-gray-700" />
+            <Maximize2 className="w-5 h-5 text-purple-700" />
           </button>
           <button
             onClick={handleDownloadPNG}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/25 transition-all font-medium"
           >
             <Download className="w-4 h-4" />
             Export PNG
@@ -271,9 +262,12 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Main visualization */}
+        {/* Main visualization - MUCH LARGER */}
         <div className="lg:col-span-3">
-          <div className="bg-gray-50 border-2 border-gray-200 rounded-lg overflow-hidden" style={{ height: '200px' }}>
+          <div 
+            className="bg-slate-50 border-2 border-purple-200 rounded-xl overflow-hidden" 
+            style={{ height: '500px' }}  /* INCREASED from 200px */
+          >
             <CytoscapeComponent
               elements={elements}
               stylesheet={cytoscapeStylesheet}
@@ -295,8 +289,8 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
         {/* Info panel */}
         <div className="lg:col-span-1 space-y-4">
           {/* Legend */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h5 className="font-semibold text-gray-900 mb-3 text-sm">Node Types</h5>
+          <div className="bg-white border border-purple-100 rounded-xl p-5 shadow-sm">
+            <h5 className="font-semibold text-slate-900 mb-4">Node Types</h5>
             <div className="space-y-2">
               {presentCategories.length > 0 ? (
                 presentCategories.map(category => {
@@ -304,41 +298,41 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
                   const color = CATEGORY_COLORS[category] || DEFAULT_COLOR;
 
                   return (
-                    <div key={category} className="flex items-center gap-2">
+                    <div key={category} className="flex items-center gap-3">
                       <div
-                        className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
+                        className="w-6 h-6 rounded-full border-2 border-white shadow-md"
                         style={{ backgroundColor: color }}
                       />
-                      <span className="text-xs text-gray-700">{displayName}</span>
+                      <span className="text-sm text-slate-700">{displayName}</span>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-xs text-gray-500 italic">No categorized nodes</div>
+                <div className="text-sm text-slate-500 italic">No categorized nodes</div>
               )}
             </div>
           </div>
 
           {/* Selected element details */}
           {selectedElement && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h5 className="font-semibold text-gray-900 mb-3 text-sm">
+            <div className="bg-white border border-purple-100 rounded-xl p-5 shadow-sm">
+              <h5 className="font-semibold text-slate-900 mb-3">
                 {selectedElement.type === 'node' ? 'Node Details' : 'Edge Details'}
               </h5>
               
               {selectedElement.type === 'node' ? (
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-sm">
                   <div>
-                    <span className="font-medium text-gray-700">ID:</span>
-                    <p className="text-gray-600 mt-1">{selectedElement.id}</p>
+                    <span className="font-medium text-slate-600">ID:</span>
+                    <p className="text-slate-900 mt-1 font-mono text-xs bg-slate-100 px-3 py-2 rounded-lg">{selectedElement.id}</p>
                   </div>
                   
                   {selectedElement.ids && selectedElement.ids.length > 0 && (
                     <div>
-                      <span className="font-medium text-gray-700">CURIEs:</span>
+                      <span className="font-medium text-slate-600">CURIEs:</span>
                       <div className="mt-1 space-y-1">
                         {selectedElement.ids.map((id: string) => (
-                          <div key={id} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                          <div key={id} className="text-xs bg-purple-50 text-purple-700 px-3 py-2 rounded-lg font-mono">
                             {id}
                           </div>
                         ))}
@@ -348,10 +342,10 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
                   
                   {selectedElement.categories && selectedElement.categories.length > 0 && (
                     <div>
-                      <span className="font-medium text-gray-700">Categories:</span>
+                      <span className="font-medium text-slate-600">Categories:</span>
                       <div className="mt-1 space-y-1">
                         {selectedElement.categories.map((cat: string) => (
-                          <div key={cat} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                          <div key={cat} className="text-xs bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg">
                             {cat.replace('biolink:', '')}
                           </div>
                         ))}
@@ -360,31 +354,31 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
                   )}
                   
                   {selectedElement.isSet && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
-                      <span className="text-xs text-yellow-800 font-medium">Set Node</span>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <span className="text-sm text-amber-800 font-medium">Set Node</span>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-sm">
                   <div>
-                    <span className="font-medium text-gray-700">ID:</span>
-                    <p className="text-gray-600 mt-1">{selectedElement.id}</p>
+                    <span className="font-medium text-slate-600">ID:</span>
+                    <p className="text-slate-900 mt-1 font-mono text-xs bg-slate-100 px-3 py-2 rounded-lg">{selectedElement.id}</p>
                   </div>
                   
                   <div>
-                    <span className="font-medium text-gray-700">Connection:</span>
-                    <p className="text-gray-600 mt-1">
+                    <span className="font-medium text-slate-600">Connection:</span>
+                    <p className="text-slate-600 mt-1 text-sm">
                       {selectedElement.source} → {selectedElement.target}
                     </p>
                   </div>
                   
                   {selectedElement.predicates && selectedElement.predicates.length > 0 && (
                     <div>
-                      <span className="font-medium text-gray-700">Predicates:</span>
+                      <span className="font-medium text-slate-600">Predicates:</span>
                       <div className="mt-1 space-y-1">
                         {selectedElement.predicates.map((pred: string) => (
-                          <div key={pred} className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">
+                          <div key={pred} className="text-xs bg-purple-50 text-purple-700 px-3 py-2 rounded-lg">
                             {pred.replace('biolink:', '')}
                           </div>
                         ))}
@@ -394,42 +388,14 @@ export const QueryGraphViewer: React.FC<QueryGraphViewerProps> = ({ queryGraph }
                   
                   {selectedElement.knowledgeType && (
                     <div>
-                      <span className="font-medium text-gray-700">Knowledge Type:</span>
-                      <p className="text-xs text-gray-600 mt-1">{selectedElement.knowledgeType}</p>
+                      <span className="font-medium text-slate-600">Knowledge Type:</span>
+                      <p className="text-sm text-slate-600 mt-1 bg-slate-100 px-3 py-2 rounded-lg">{selectedElement.knowledgeType}</p>
                     </div>
                   )}
                 </div>
               )}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="text-xs text-blue-600 font-medium mb-1">Query Nodes</div>
-          <div className="text-2xl font-bold text-blue-900">
-            {Object.keys(queryGraph.nodes).length}
-          </div>
-        </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-          <div className="text-xs text-purple-600 font-medium mb-1">Query Edges</div>
-          <div className="text-2xl font-bold text-purple-900">
-            {Object.keys(queryGraph.edges).length}
-          </div>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-          <div className="text-xs text-green-600 font-medium mb-1">Fixed Nodes</div>
-          <div className="text-2xl font-bold text-green-900">
-            {Object.values(queryGraph.nodes).filter(n => n.ids && n.ids.length > 0).length}
-          </div>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-          <div className="text-xs text-orange-600 font-medium mb-1">Set Nodes</div>
-          <div className="text-2xl font-bold text-orange-900">
-            {Object.values(queryGraph.nodes).filter(n => n.is_set).length}
-          </div>
         </div>
       </div>
     </div>

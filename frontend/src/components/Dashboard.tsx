@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
-import { Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  Info, 
+  ChevronDown, 
+  ChevronUp, 
+  Code2, 
+  Sparkles,
+  ArrowLeft
+} from 'lucide-react';
 import { QueryBuilder } from './QueryBuilder';
 import { JobStatus } from './JobStatus';
 import { ResultsViewer } from './ResultsViewer';
-import { ResultsList } from './ResultsList';
 
 export const Dashboard: React.FC = () => {
   const [previewQuery, setPreviewQuery] = useState<any>(null);
@@ -12,7 +18,7 @@ export const Dashboard: React.FC = () => {
   const [resultsData, setResultsData] = useState<any>(null);
   const [selectedRuleKey, setSelectedRuleKey] = useState<string | null>(null);
   const [filteredResultIndices, setFilteredResultIndices] = useState<number[]>([]);
-  const [queryBuilderExpanded, setQueryBuilderExpanded] = useState(true); // Collapsed when results available
+  const [queryBuilderExpanded, setQueryBuilderExpanded] = useState(true);
 
   const handleJobCreated = (jobId: string) => {
     setCurrentJobId(jobId);
@@ -20,7 +26,7 @@ export const Dashboard: React.FC = () => {
     setResultsData(null);
     setSelectedRuleKey(null);
     setFilteredResultIndices([]);
-    setQueryBuilderExpanded(true); // Keep expanded when job starts
+    setQueryBuilderExpanded(true);
   };
 
   const handleJobComplete = (jobId: string) => {
@@ -31,7 +37,7 @@ export const Dashboard: React.FC = () => {
   const handleResultsLoad = (data: any) => {
     setResultsData(data);
     if (data) {
-      setQueryBuilderExpanded(false); // Auto-collapse when results load
+      setQueryBuilderExpanded(false);
     }
   };
 
@@ -42,35 +48,43 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Query Builder Collapse Toggle - Fixed position */}
+      {/* Collapsed Query Builder Toggle */}
       {!queryBuilderExpanded && resultsData && (
         <button
           onClick={() => setQueryBuilderExpanded(true)}
-          className="fixed left-4 top-24 z-50 bg-purple-600 text-white px-4 py-2 rounded-r-lg shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
+          className="fixed left-6 top-36 z-40 flex items-center gap-2 px-4 py-2.5 bg-white border border-purple-200 rounded-xl shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-200 text-purple-700 hover:text-purple-900 font-medium text-sm"
         >
-          <ChevronDown className="w-5 h-5 rotate-90" />
-          <span>Show Query Builder</span>
+          <ArrowLeft className="w-4 h-4" />
+          Show Query Builder
         </button>
       )}
 
-      {/* Query Builder & Results Grid */}
+      {/* Main Content Grid */}
       <div className={`grid gap-6 transition-all duration-300 ${
-        queryBuilderExpanded ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
+        queryBuilderExpanded ? 'lg:grid-cols-2' : 'grid-cols-1'
       }`}>
-        {/* Left Column - Query Builder & Job Status (can be hidden) */}
+        {/* Left Column - Query Builder & Job Status */}
         {queryBuilderExpanded && (
-          <div className="space-y-6">
-            {/* Collapsible Query Builder */}
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-              <div className="flex items-center justify-between p-6 bg-gray-50 border-b">
-                <h3 className="text-xl font-semibold text-gray-900">Build Query</h3>
+          <div className="space-y-4">
+            {/* Query Builder Card */}
+            <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50/50 border-b border-purple-100/60">
+                <div className="flex items-center gap-3">
+                  {/* <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div> */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Query Builder</h3>
+                    <p className="text-sm text-slate-500">Define your biomedical query</p>
+                  </div>
+                </div>
                 {resultsData && (
                   <button
                     onClick={() => setQueryBuilderExpanded(false)}
-                    className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-white transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
                   >
                     <ChevronUp className="w-4 h-4 -rotate-90" />
-                    <span>Hide</span>
+                    Collapse
                   </button>
                 )}
               </div>
@@ -83,14 +97,15 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             
+            {/* Job Status */}
             {currentJobId && (
               <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
             )}
           </div>
         )}
 
-        {/* Right Column - Results Tabs (expands to full width when left is hidden) */}
-        <div className="space-y-6">
+        {/* Right Column - Results or Preview */}
+        <div className={`space-y-8 ${!queryBuilderExpanded ? 'lg:col-span-1' : ''}`}>
           {completedJobId ? (
             <ResultsViewer 
               jobId={completedJobId} 
@@ -99,58 +114,98 @@ export const Dashboard: React.FC = () => {
               onRuleSelect={handleRuleSelect}
             />
           ) : (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">TRAPI Query Preview</h3>
-            <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-              <pre className="text-sm text-green-400 font-mono">
-              {JSON.stringify(previewQuery || {}, null, 2)}
-              </pre>
+            /* Query Preview */
+            <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center">
+                    <Code2 className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">TRAPI Query Preview</h3>
+                    <p className="text-sm text-slate-400">Live preview of your query</p>
+                  </div>
+                </div>
+                <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">TRAPI v1.4</span>
+              </div>
+              
+              <div className="bg-slate-900">
+                {/* Code content */}
+                <div className="p-4 overflow-x-auto max-h-96 custom-scrollbar">
+                  <pre 
+                    className="text-sm leading-relaxed"
+                    style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
+                  >
+                    <code>
+                      {formatJsonWithSyntaxHighlighting(previewQuery || {})}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+              
+              {/* Endpoint info */}
+              <div className="px-6 py-4 bg-purple-50 border-t border-purple-100">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm text-purple-700">
+                    Target: <span className="font-mono text-purple-600 text-xs">https://answercoalesce.renci.org/query</span>
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-              <Info className="w-4 h-4" />
-              <span>
-                Endpoint: <span className="font-mono">https://answercoalesce.renci.org/query</span>
-              </span>
-            </div>
-          </div>
           )}
         </div>
       </div>
-
-      {/* Full-width results list - Shows filtered results when rule selected, all results otherwise */}
-      {/* {resultsData && (
-        selectedRuleKey ? (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Results Containing This Rule ({filteredResultIndices.length})
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Click to expand and view path details
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedRuleKey(null)}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg"
-              >
-                Show All Results
-              </button>
-            </div>
-            <ResultsList 
-              results={{
-                ...resultsData,
-                message: {
-                  ...resultsData.message,
-                  results: filteredResultIndices.map(idx => resultsData.message.results[idx])
-                }
-              }} 
-            />
-          </div>
-        ) : (
-          <ResultsList results={resultsData} />
-        )
-      )} */}
     </div>
   );
 };
+
+// Helper function for JSON syntax highlighting - Purple themed
+function formatJsonWithSyntaxHighlighting(obj: any, indent = 0): React.ReactNode {
+  const spaces = '  '.repeat(indent);
+  
+  if (obj === null) {
+    return <span className="text-fuchsia-400">null</span>;
+  }
+  
+  if (typeof obj === 'boolean') {
+    return <span className="text-fuchsia-400">{obj.toString()}</span>;
+  }
+  
+  if (typeof obj === 'number') {
+    return <span className="text-amber-400">{obj}</span>;
+  }
+  
+  if (typeof obj === 'string') {
+    return <span className="text-emerald-400">"{obj}"</span>;
+  }
+  
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return '[]';
+    
+    const items = obj.map((item, idx) => (
+      <React.Fragment key={idx}>
+        {'\n'}{spaces}  {formatJsonWithSyntaxHighlighting(item, indent + 1)}
+        {idx < obj.length - 1 ? ',' : ''}
+      </React.Fragment>
+    ));
+    
+    return <>{'['}{items}{'\n'}{spaces}{']'}</>;
+  }
+  
+  if (typeof obj === 'object') {
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return '{}';
+    
+    const items = keys.map((key, idx) => (
+      <React.Fragment key={key}>
+        {'\n'}{spaces}  <span className="text-violet-400">"{key}"</span>: {formatJsonWithSyntaxHighlighting(obj[key], indent + 1)}
+        {idx < keys.length - 1 ? ',' : ''}
+      </React.Fragment>
+    ));
+    
+    return <>{'{'}{items}{'\n'}{spaces}{'}'}</>;
+  }
+  
+  return String(obj);
+}

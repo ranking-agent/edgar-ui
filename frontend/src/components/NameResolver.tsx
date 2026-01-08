@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
-import { Search, CheckCircle, XCircle, Loader, Copy } from 'lucide-react';
+import { 
+  Search, 
+  CheckCircle2, 
+  XCircle, 
+  Loader2, 
+  Copy,
+  Sparkles,
+  Tag,
+  Info,
+  ChevronDown,
+  BookOpen,
+  ExternalLink
+} from 'lucide-react';
 import axios from 'axios';
 
 const RESOLVER_URL = (params: string) =>
-    `https://robokop-name-resolver.apps.renci.org/lookup?string=${encodeURIComponent(
-      params
-    )}&autocomplete=true&highlighting=false&offset=0&limit=10`;
-  
+  `https://robokop-name-resolver.apps.renci.org/lookup?string=${encodeURIComponent(
+    params
+  )}&autocomplete=true&highlighting=false&offset=0&limit=10`;
 
-interface ResolveName {
+interface ResolvedName {
   curie: string;
   label: string;
   synonyms: string[];
@@ -16,13 +27,13 @@ interface ResolveName {
   score?: number;
 }
 
-
 export const ResolveName: React.FC = () => {
-  const [name, setNodeId] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ResolveName[]>([]);
+  const [results, setResults] = useState<ResolvedName[]>([]);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedSynonyms, setExpandedSynonyms] = useState<Set<number>>(new Set());
 
   const resolveName = async () => {
     if (!name.trim()) return;
@@ -30,6 +41,7 @@ export const ResolveName: React.FC = () => {
     setLoading(true);
     setError('');
     setResults([]);
+    setExpandedSynonyms(new Set());
 
     try {
       const response = await axios.get(RESOLVER_URL(name.trim()));
@@ -37,7 +49,7 @@ export const ResolveName: React.FC = () => {
       if (Array.isArray(resolved) && resolved.length > 0) {
         setResults(resolved);   
       } else {
-        setError("No results found for the synonym.");
+        setError("No results found for this term. Try a different spelling or related term.");
       }
     } catch (err: any) {
       console.error('Error resolving name:', err);
@@ -53,224 +65,284 @@ export const ResolveName: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const toggleSynonyms = (idx: number) => {
+    const newExpanded = new Set(expandedSynonyms);
+    if (newExpanded.has(idx)) {
+      newExpanded.delete(idx);
+    } else {
+      newExpanded.add(idx);
+    }
+    setExpandedSynonyms(newExpanded);
+  };
+
+  const exampleTerms = ['Headache', 'Alzheimer', 'Metformin', 'BRCA1'];
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Search className="w-6 h-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Name Resolver</h2>
-        </div>
-        <p className="text-gray-600">
-          Resolve biomedical name or synonym to their standard CURIEs using the SRI Name Resolver service.
-        </p>
-      </div>
-
-      {/* Input */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Enter Name 
-        </label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setNodeId(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && resolveName()}
-            placeholder="e.g., Headache, Cancer, Alzheimer"
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button
-            onClick={resolveName}
-            disabled={loading || !name.trim()}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader className="w-5 h-5 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Search className="w-5 h-5" />
-                Lookup
-              </>
-            )}
-          </button>
+      {/* Header Card */}
+      <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 overflow-hidden">
+        <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200/60">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+              <BookOpen className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                Name Resolver
+              </h2>
+              <p className="text-slate-500">
+                Look up biomedical terms and find their standard identifiers
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="text-sm text-gray-600">Examples:</span>
-          {['Headache', 'Cancer', 'Alzheimer'].map(
-            (example) => (
+        <div className="p-6 space-y-6">
+          {/* Search Input */}
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-slate-700">
+              Enter Term or Synonym
+            </label>
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && resolveName()}
+                  placeholder="e.g., Headache, Cancer, Alzheimer..."
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900 placeholder-slate-400"
+                />
+              </div>
               <button
-                key={example}
-                onClick={() => setNodeId(example)}
-                className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                onClick={resolveName}
+                disabled={loading || !name.trim()}
+                className="px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {example}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5" />
+                    Lookup
+                  </>
+                )}
               </button>
-            )
-          )}
+            </div>
+          </div>
+
+          {/* Quick Examples */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500">Try these:</span>
+            {exampleTerms.map((term) => (
+              <button
+                key={term}
+                onClick={() => setName(term)}
+                className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Error */}
+      {/* Error State */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-5 bg-red-50 border border-red-200 rounded-xl">
+          <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-red-900">Error</h3>
-            <p className="text-sm text-red-700">{error}</p>
+            <h3 className="font-semibold text-red-900">No Results Found</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
           </div>
         </div>
       )}
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="space-y-6">
-        {results.map((result, idx) => (
-        <div key={idx} className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center gap-2 mb-6">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-            <h3 className="text-xl font-semibold text-gray-900">
-                Lookup Result {idx + 1}
+        <div className="space-y-4">
+          {/* Results Summary */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Found {results.length} result{results.length > 1 ? 's' : ''}
             </h3>
-            </div>
+          </div>
 
-            {/** Preferred ID section */}
-            <div className="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-            <div className="text-sm text-green-600 font-medium mb-2">
-                Preferred Identifier
-            </div>
-            <div className="flex items-center justify-between">
-                <div>
-                <div className="font-mono text-lg font-semibold text-gray-900">
-                    {result.curie}
-                </div>
-                <div className="text-gray-700 mt-1">{result.label}</div>
-                </div>
-
-                <button
-                onClick={() => copyToClipboard(result.curie)}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                >
-                {copiedId === result.curie ? (
-                    <>
-                    <CheckCircle className="w-4 h-4" />
-                    Copied!
-                    </>
-                ) : (
-                    <>
-                    <Copy className="w-4 h-4" />
-                    Copy
-                    </>
-                )}
-                </button>
-            </div>
-            </div>
-
-            {/** Types */}
-            {result.types && (
-            <div className="mb-6">
-                <h4 className="font-semibold text-gray-900 mb-3">Types</h4>
-                <div className="flex flex-wrap gap-2">
-                {result.types.map((t, i) => (
-                    <span
-                    key={i}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-                    >
-                    {t.replace("biolink:", "")}
+          {/* Result Cards */}
+          {results.map((result, idx) => (
+            <div 
+              key={idx} 
+              className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 overflow-hidden"
+            >
+              {/* Result Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  <span className="font-semibold text-emerald-800">Match #{idx + 1}</span>
+                  {result.score !== undefined && (
+                    <span className="ml-auto text-sm text-emerald-600 font-mono">
+                      Score: {result.score.toFixed(2)}
                     </span>
-                ))}
+                  )}
                 </div>
-            </div>
-            )}
+              </div>
 
-            {/* Information Content */}
-            {result.score !== undefined && (
-                <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="text-sm text-purple-600 font-medium mb-1">Score</div>
-                <div className="text-2xl font-bold text-purple-900">
-                    {result.score.toFixed(4)}
-                </div>
-                </div>
-            )}
-
-            {/** Synonyms */}
-            {result.synonyms && result.synonyms.length > 0 && (
-            <div>
-                <h4 className="font-semibold text-gray-900 mb-3">
-                Synonyms ({result.synonyms.length})
-                </h4>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <div className="space-y-2">
-                    {result.synonyms.map((syn, i) => (
-                    <div
-                        key={i}
-                        className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
-                    >
-                        <div className="flex items-center justify-between">
-                        <div className="font-mono text-sm font-semibold text-gray-900">
-                            {syn}
-                        </div>
-
-                        <button
-                            onClick={() => copyToClipboard(syn)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        >
-                            {copiedId === syn ? (
-                            <CheckCircle className="w-4 h-4" />
-                            ) : (
-                            <Copy className="w-4 h-4" />
-                            )}
-                        </button>
-                        </div>
+              <div className="p-6 space-y-5">
+                {/* Preferred ID Card */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-5 text-white">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 text-purple-100 text-sm font-medium mb-2">
+                      <Sparkles className="w-4 h-4" />
+                      Preferred Identifier
                     </div>
-                    ))}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xl font-bold font-mono mb-1">
+                          {result.curie}
+                        </div>
+                        <div className="text-teal-100">{result.label}</div>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(result.curie)}
+                        className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-colors flex items-center gap-2 font-medium text-sm"
+                      >
+                        {copiedId === result.curie ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                </div>
+
+                {/* Types */}
+                {result.types && result.types.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="w-4 h-4 text-slate-400" />
+                      <h4 className="font-medium text-slate-700">Entity Types</h4>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {result.types.map((type, i) => (
+                        <span
+                          key={i}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-200"
+                        >
+                          {type.replace('biolink:', '')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Synonyms */}
+                {result.synonyms && result.synonyms.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => toggleSynonyms(idx)}
+                      className="flex items-center gap-2 w-full text-left"
+                    >
+                      <ChevronDown 
+                        className={`w-4 h-4 text-slate-400 transition-transform ${
+                          expandedSynonyms.has(idx) ? 'rotate-180' : ''
+                        }`} 
+                      />
+                      <h4 className="font-medium text-slate-700">
+                        Synonyms
+                        <span className="ml-2 text-sm font-normal text-slate-500">
+                          ({result.synonyms.length})
+                        </span>
+                      </h4>
+                    </button>
+
+                    {expandedSynonyms.has(idx) && (
+                      <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-64 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-1.5">
+                          {result.synonyms.map((syn, i) => (
+                            <div
+                              key={i}
+                              className="group flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 hover:border-slate-300 transition-colors"
+                            >
+                              <span className="text-sm text-slate-700">{syn}</span>
+                              <button
+                                onClick={() => copyToClipboard(syn)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                {copiedId === syn ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            )}
-        </div>))}
+          ))}
 
-        {/* Raw JSON for the entire list */}
-        <div className="mt-6">
-            <details>
-                <summary className="cursor-pointer font-semibold text-gray-900 hover:text-blue-600">
-                View Raw JSON
-                </summary>
-                <div className="mt-3 bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                <pre className="text-sm text-green-400 font-mono">
-                    {JSON.stringify(results, null, 2)}
-                </pre>
-                </div>
-            </details>
+          {/* Raw JSON */}
+          <details className="group bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 overflow-hidden">
+            <summary className="cursor-pointer px-6 py-4 font-semibold text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-2 bg-slate-50">
+              <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
+              View Raw JSON Response
+            </summary>
+            <div className="bg-slate-900 p-4 overflow-x-auto max-h-80 custom-scrollbar">
+              <pre className="text-sm text-emerald-400 font-mono">
+                {JSON.stringify(results, null, 2)}
+              </pre>
+            </div>
+          </details>
         </div>
-    </div>
-    )}
-
-      
+      )}
 
       {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <h4 className="font-semibold text-blue-900 mb-2">About Name Resolver</h4>
-        <ul className="space-y-1 text-sm text-blue-800">
-          <li>• Converts name or synonyms to their preferred identifiers or canonical form</li>
-          <li>• Provides equivalent synonyms from multiple sources</li>
-          <li>• Returns entity types and metadata</li>
-          <li>• Powered by SRI Name Resolver Service v1.5</li>
-        </ul>
-        <div className="mt-3 text-xs text-blue-600">
-          Endpoint:{' '}
-          <a
-            href="https://robokop-name-resolver.apps.renci.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-blue-800"
-          >
-            https://robokop-name-resolver.apps.renci.org/
-          </a>
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-semibold text-purple-900 mb-2">About Name Resolver</h4>
+            <ul className="space-y-1.5 text-sm text-purple-800">
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full mt-1.5 flex-shrink-0" />
+                Converts names or synonyms to their preferred identifiers
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full mt-1.5 flex-shrink-0" />
+                Provides comprehensive synonym lists from multiple sources
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 bg-purple-400 rounded-full mt-1.5 flex-shrink-0" />
+                Returns entity types and relevance scores
+              </li>
+            </ul>
+            <div className="mt-3 pt-3 border-t border-purple-200">
+              <a
+                href="https://robokop-name-resolver.apps.renci.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-purple-700 hover:text-purple-900 font-medium flex items-center gap-1"
+              >
+                SRI Name Resolver Service
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

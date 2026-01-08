@@ -1,6 +1,5 @@
 """
 EDGAR - Enrichment-Driven GrAph Reasoner
-FastAPI Backend - Supports multiple use cases
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
