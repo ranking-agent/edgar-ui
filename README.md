@@ -2,7 +2,7 @@
 
 A web application for biomedical knowledge graph enrichment analysis, enrichment-driven Graph Reasoner -EDGAR (link prediction) through the TRAPI (Translator Reasoner API) standard.
 
-![EDGAR Architecture](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square) ![Frontend](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-61DAFB?style=flat-square) ![Database](https://img.shields.io/badge/Database-Neo4j-008CC1?style=flat-square) ![Cache](https://img.shields.io/badge/Cache-Redis-DC382D?style=flat-square)
+![EDGAR Architecture](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square) ![Frontend](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-61DAFB?style=flat-square) 
 
 ## Overview
 

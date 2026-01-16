@@ -58,7 +58,6 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Main Content Grid */}
-      {/* Main Content Grid */}
       <div className={`grid gap-6 transition-all duration-300 ${
         queryBuilderExpanded ? 'lg:grid-cols-2' : 'grid-cols-1'
       }`}>
@@ -101,7 +100,7 @@ export const Dashboard: React.FC = () => {
 
           
         )}
-        
+
         {/* Right Column - Results or Preview */}
         <div className={`flex justify-between space-y-6 ${!queryBuilderExpanded ? 'lg:col-span-1' : queryBuilderExpanded && resultsData ? 'lg:col-span-1' : ''}`}>
           {completedJobId ? (
