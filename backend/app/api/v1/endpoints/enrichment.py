@@ -2,7 +2,8 @@
 EDGAR Enrichment analysis endpoints
 Returns full TRAPI response from AnswerCoalesce
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from typing import List
 from app.models.enrichment import (
@@ -31,7 +32,6 @@ router = APIRouter()
 )
 async def create_enrichment_analysis(
     request: EnrichmentAnalysisRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     enrichment_service: EnrichmentService = Depends(get_enrichment_service)
 ):
@@ -47,11 +47,10 @@ async def create_enrichment_analysis(
             request=request
         )
         
+        print(f">>> Creating task for job {job.id}")
         # Start background task
-        background_tasks.add_task(
-            enrichment_service.run_analysis,
-            job.id
-        )
+        asyncio.create_task(enrichment_service.run_analysis(job.id))
+        print(f">>> Task created for job {job.id}")  
         
         return EnrichmentAnalysisResponse(
             job_id=job.id,
@@ -67,6 +66,8 @@ async def create_enrichment_analysis(
             detail=str(e)
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start analysis: {str(e)}"
@@ -149,7 +150,11 @@ async def get_analysis_results(
         results = await enrichment_service.get_results(job_id)
         
         # Return as raw JSON to preserve all AC fields
-        return JSONResponse(content=results.dict(exclude_none=True))
+        if isinstance(results, dict):
+            return JSONResponse(content=results)
+        else:
+            return JSONResponse(content=results.dict(exclude_none=True))
+        # return JSONResponse(content=results.dict(exclude_none=True))
         
     except ValueError as e:
         raise HTTPException(

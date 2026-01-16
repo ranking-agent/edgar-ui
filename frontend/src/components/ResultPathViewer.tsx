@@ -34,6 +34,7 @@ const layoutList = {
     fit: false,
     padding: padding,
     animate: false,
+    avoidOverlap: true,
     nodePlacement: 'LINEAR_SEGMENTS',
     edgeSpacingFactor: spacingFactor,
     nodeLayering: 'NETWORK_SIMPLEX',
@@ -283,7 +284,6 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
     }
   };
 
-  // MUCH LARGER NODES AND EDGES - using numeric values
   const cytoscapeStylesheet: any[] = [
     {
       selector: 'node',
@@ -291,19 +291,19 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
         'shape': 'round-rectangle',
         'background-color': 'data(color)',
         'label': 'data(label)',
-        'width': 280,
+        'width': 360,
         'height': 100,
         'text-valign': 'center',
         'text-halign': 'center',
-        'padding': 20,
-        'font-size': 34,
+        'padding': 30,
+        'font-size': 65,
         'font-weight': 'bold',
         'color': '#1e293b',
         'text-wrap': 'wrap',
-        'text-max-width': 20,
+        'text-max-width': 25,
         'border-width': 9,
         'border-color': '#475569',
-        'text-outline-width': 0,
+        'text-outline-width': 1,
       },
     },
     {
@@ -350,15 +350,15 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
     {
       selector: 'edge',
       style: {
-        'width': 15,
+        'width': 25,
         'line-color': '#64748b',
         'target-arrow-color': '#64748b',
         'target-arrow-shape': 'triangle',
         'arrow-scale': 2.5,
         'curve-style': 'unbundled-bezier',  // Auto-bundles parallel edges   or bezier
-        'control-point-step-size': 100,  // Spacing for parallel edges
+        'control-point-step-size': 150,  // Spacing for parallel edges
         'label': 'data(label)',
-        'font-size': 30,
+        'font-size': 40,
         'font-weight': 600,
         'text-rotation': 'autorotate',
         'text-margin-y': -15,
@@ -575,7 +575,7 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
                       <div className="w-20 h-10 rounded-lg bg-yellow-100 border-2 border-yellow-600 flex items-center justify-center">
                         <span className="text-xs text-gray-800 font-bold">Input</span>
                       </div>
-                      <span className="text-sm text-gray-700">Input Node(s)</span>
+                      <span className="text-sm text-gray-700">Input Node</span>
                     </div>
                   )}
                   {elements.some(el => el.data.nodeType === 'query') && (
@@ -655,6 +655,30 @@ export const ResultPathViewer: React.FC<ResultPathViewerProps> = ({
                       </span>
                     </p>
                   </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Provenance:</span>
+                    <p className="text-xs text-gray-600 mt-1 break-all">
+                      {selectedElement.sources && selectedElement.sources.length > 0 ? (
+                        selectedElement.sources.map((s: { resource_role: string; resource_id: string; }, i: React.Key | null | undefined) => (
+                          <div key={i} className="flex items-center">
+                            {/* Capitalizing resource role and resource id */}
+                            <div className="font-medium">
+                              {s.resource_role.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                            </div>
+                            
+                            <span className="mx-1">:</span> {/* Colon separator */}
+                            
+                            <div className="ml-2 text-gray-500">
+                              {s.resource_id.replace('infores:', '').replace(/\b\w/g, (char) => char.toUpperCase())}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span>No sources available</span>
+                      )}
+                    </p>
+
+                  </div>
                 </div>
               )}
             </div>
@@ -714,6 +738,7 @@ function extractResultSubgraph(
               predicate: edge.predicate,
               edgeType: 'main',
               attributes: edge.attributes,
+              sources: edge.sources
             });
 
             const supportGraphAttrs = edge.attributes?.filter(
@@ -744,6 +769,7 @@ function extractResultSubgraph(
                         predicate: supportEdge.predicate,
                         edgeType: 'support',
                         attributes: supportEdge.attributes,
+                        sources: supportEdge.sources
                       });
                     }
                   });
@@ -841,6 +867,7 @@ function extractResultSubgraph(
                   predicate: nestedEdge.predicate,
                   edgeType: 'support',
                   attributes: nestedEdge.attributes,
+                  sources: nestedEdge.sources,
                 });
               }
             }
@@ -950,10 +977,10 @@ function convertToCytoscapeFormat(subgraph: any) {
 
   // MUCH WIDER column spacing
   const columnPositions: Record<string, number> = {
-    set: 300,
-    intermediate: 1000,
-    query: 1800,
-    result: 2500
+    set: 400,
+    intermediate: 1200,
+    query: 2100,
+    result: 3000
   };
 
   const maxNodesInColumn = Math.max(

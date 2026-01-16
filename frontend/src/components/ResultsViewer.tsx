@@ -90,7 +90,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const fetchResults = async () => {
       try {
         const data = await enrichmentAPI.getResults(jobId);
-        console.log('Fetched results:', data);
+        // console.log('Fetched results:', data);
         setResults(data);
         onResultsLoad?.(data);
       } catch (err: any) {
@@ -165,6 +165,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
   const queryInputIds = new Set<string>();
   let queryGraphPredicate = '';
   let querySubjectIsInput = true;
+  let outputCategory = ''
   
   Object.values(queryGraph.nodes).forEach((node: any) => {
     if (node.ids) {
@@ -180,8 +181,10 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const objectNode = queryGraph.nodes[edge.object];
     if (subjectNode?.ids?.some((id: string) => queryInputIds.has(id))) {
       querySubjectIsInput = true;
+      outputCategory = subjectNode?.categories
     } else if (objectNode?.ids?.some((id: string) => queryInputIds.has(id))) {
       querySubjectIsInput = false;
+      outputCategory = objectNode?.categories
     }
   });
 
@@ -206,16 +209,15 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
         if (auxGraph?.edges) {
           auxGraph.edges.forEach((auxEdgeId: string) => {
             const auxEdge = knowledgeGraph.edges?.[auxEdgeId];
-            
+            // console.log(auxEdge)
             if (auxEdge?.predicate === 'biolink:member_of') {
               const memberId = auxEdge.subject;
               const memberNode = knowledgeGraph.nodes?.[memberId];
-              
               if (!lookupSetMembers.has(memberId)) {
                 lookupSetMembers.set(memberId, {
                   nodeId: memberId,
                   nodeName: memberNode?.name || memberId,
-                  category: memberNode?.categories?.[0]?.replace('biolink:', '') || 'Unknown',
+                  category: outputCategory?.[0]?.replace('biolink:', '') || '',
                 });
               }
             }
@@ -229,7 +231,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                 lookupSetMembers.set(memberId, {
                   nodeId: memberId,
                   nodeName: memberNode?.name || memberId,
-                  category: memberNode?.categories?.[0]?.replace('biolink:', '') || 'Unknown',
+                  category: outputCategory?.[0]?.replace('biolink:', '') || '',
                   predicate: auxEdge.predicate?.replace('biolink:', '') || queryGraphPredicate,
                 });
               }
@@ -495,7 +497,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
 
       if (memberId && pValue !== null) {
         const memberNode = knowledgeGraph?.nodes[memberId];
-        const primaryCategory = memberNode?.categories?.[0]?.replace('biolink:', '') || 'Entity';
+        const primaryCategory = outputCategory?.[0]?.replace('biolink:', '') || '';
         connectedMembers.push({
           id: memberId,
           name: memberNode?.name || memberId,
@@ -825,22 +827,6 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
       <div className="p-6 space-y-6">
         {/* Stats - Clickable cards replace tabs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Lookup Results - Clickable */}
-          <button
-            onClick={() => {
-              setActiveTab('direct');
-              setSelectedRule(null);
-              onTabChange?.('direct');
-            }}
-            className={`text-left border-2 rounded-lg p-4 transition-all ${
-              activeTab === 'direct'
-                ? 'bg-green-50 border-green-500 shadow-md'
-                : 'bg-white border-green-300 hover:bg-green-50'
-            }`}
-          >
-            <div className="text-sm text-green-700 font-semibold mb-1">Lookup Results</div>
-            <div className="text-3xl font-bold text-green-900">{lookupNodes.length}</div>
-          </button>
           
           {/* Inferred Results - Clickable to show all results */}
           <button
@@ -876,6 +862,23 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
           >
             <div className="text-sm text-blue-700 font-semibold mb-1">Enrichment--Inference Rules</div>
             <div className="text-3xl font-bold text-blue-900">{sortedRules.length}</div>
+          </button>
+
+           {/* Lookup Results - Clickable */}
+          <button
+            onClick={() => {
+              setActiveTab('direct');
+              setSelectedRule(null);
+              onTabChange?.('direct');
+            }}
+            className={`text-left border-2 rounded-lg p-4 transition-all ${
+              activeTab === 'direct'
+                ? 'bg-green-50 border-green-500 shadow-md'
+                : 'bg-white border-green-300 hover:bg-green-50'
+            }`}
+          >
+            <div className="text-sm text-green-700 font-semibold mb-1">Lookup Results</div>
+            <div className="text-3xl font-bold text-green-900">{lookupNodes.length}</div>
           </button>
           
           {/* Download Button */}

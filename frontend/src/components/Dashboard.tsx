@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Info, 
-  ChevronDown, 
+  Info,  
   ChevronUp, 
   Code2, 
-  Sparkles,
   ArrowLeft
 } from 'lucide-react';
 import { QueryBuilder } from './QueryBuilder';
@@ -47,7 +45,7 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Collapsed Query Builder Toggle */}
       {!queryBuilderExpanded && resultsData && (
         <button
@@ -60,6 +58,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Main Content Grid */}
+      {/* Main Content Grid */}
       <div className={`grid gap-6 transition-all duration-300 ${
         queryBuilderExpanded ? 'lg:grid-cols-2' : 'grid-cols-1'
       }`}>
@@ -70,9 +69,6 @@ export const Dashboard: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50/50 border-b border-purple-100/60">
                 <div className="flex items-center gap-3">
-                  {/* <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div> */}
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">Query Builder</h3>
                     <p className="text-sm text-slate-500">Define your biomedical query</p>
@@ -102,10 +98,12 @@ export const Dashboard: React.FC = () => {
               <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
             )}
           </div>
-        )}
 
+          
+        )}
+        
         {/* Right Column - Results or Preview */}
-        <div className={`space-y-8 ${!queryBuilderExpanded ? 'lg:col-span-1' : ''}`}>
+        <div className={`flex justify-between space-y-6 ${!queryBuilderExpanded ? 'lg:col-span-1' : queryBuilderExpanded && resultsData ? 'lg:col-span-1' : ''}`}>
           {completedJobId ? (
             <ResultsViewer 
               jobId={completedJobId} 
@@ -130,7 +128,6 @@ export const Dashboard: React.FC = () => {
               </div>
               
               <div className="bg-slate-900">
-                {/* Code content */}
                 <div className="p-4 overflow-x-auto max-h-96 custom-scrollbar">
                   <pre 
                     className="text-sm leading-relaxed"
@@ -143,7 +140,6 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
               
-              {/* Endpoint info */}
               <div className="px-6 py-4 bg-purple-50 border-t border-purple-100">
                 <div className="flex items-center gap-2">
                   <Info className="w-4 h-4 text-purple-500" />

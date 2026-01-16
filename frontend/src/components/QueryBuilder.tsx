@@ -22,7 +22,7 @@ const EXAMPLE_QUERIES = [
   },
   {
     label: 'Genes associated with a Disease',
-    description: 'e.g., DOID:0050430 (Alzheimer disease)',
+    description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
     value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
     example: 'DOID:0050430',
     exampleIsTarget: true
@@ -55,6 +55,15 @@ interface QueryBuilderProps {
   onQueryPreview?: (query: any) => void; 
 }
 
+// Helper function to debounce
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQueryPreview }) => {
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
@@ -70,6 +79,98 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedExample, setSelectedExample] = useState<number | null>(null);
+
+  // Name resolution states
+  const [isNormalizingSource, setIsNormalizingSource] = useState(false);
+  const [isNormalizingTarget, setIsNormalizingTarget] = useState(false);
+  const [sourceNormalizedName, setSourceNormalizedName] = useState('');
+  const [targetNormalizedName, setTargetNormalizedName] = useState('');
+  const [sourceSuggestions, setSourceSuggestions] = useState<any[]>([]);
+  const [targetSuggestions, setTargetSuggestions] = useState<any[]>([]);
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [showTargetDropdown, setShowTargetDropdown] = useState(false);
+
+  // Autocomplete search function
+  const searchNodes = async (query: string): Promise<any[]> => {
+    if (!query || query.length < 2) return [];
+    
+    try {
+      const response = await fetch(`https://name-resolution-sri.renci.org/lookup?string=${encodeURIComponent(query)}&limit=10`);
+      const data = await response.json();
+      return data || [];
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
+  };
+
+  // Debounced search for source
+  const handleSourceSearch = debounce(async (value: string) => {
+    if (value.length < 2) {
+      setSourceSuggestions([]);
+      setShowSourceDropdown(false);
+      return;
+    }
+    
+    setIsNormalizingSource(true);
+    const suggestions = await searchNodes(value);
+    setSourceSuggestions(suggestions);
+    setShowSourceDropdown(suggestions.length > 0);
+    setIsNormalizingSource(false);
+  }, 500);
+
+  // Debounced search for target
+  const handleTargetSearch = debounce(async (value: string) => {
+    if (value.length < 2) {
+      setTargetSuggestions([]);
+      setShowTargetDropdown(false);
+      return;
+    }
+    
+    setIsNormalizingTarget(true);
+    const suggestions = await searchNodes(value);
+    setTargetSuggestions(suggestions);
+    setShowTargetDropdown(suggestions.length > 0);
+    setIsNormalizingTarget(false);
+  }, 500);
+
+  // Handle selecting a source suggestion
+  const selectSourceSuggestion = (suggestion: any) => {
+    setSourceId(suggestion.curie);
+    setSourceNormalizedName(suggestion.label);
+    
+    // Auto-select category
+    const types = suggestion.types || [];
+    for (const type of types) {
+      const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
+      if (NODE_CATEGORIES.includes(biolinkType)) {
+        setSourceCategory(biolinkType);
+        break;
+      }
+    }
+    
+    setShowSourceDropdown(false);
+    setSourceSuggestions([]);
+  };
+
+  // Handle selecting a target suggestion
+  const selectTargetSuggestion = (suggestion: any) => {
+    setTargetId(suggestion.curie);
+    setTargetNormalizedName(suggestion.label);
+    
+    // Auto-select category
+    const types = suggestion.types || [];
+    for (const type of types) {
+      const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
+      if (NODE_CATEGORIES.includes(biolinkType)) {
+        setTargetCategory(biolinkType);
+        break;
+      }
+    }
+    
+    setShowTargetDropdown(false);
+    setTargetSuggestions([]);
+  };
 
   const buildTrapiQuery = () => {
     const qualifierConstraints = [];
@@ -142,9 +243,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     if (exampleIsTarget) {
       setSourceId('');
       setTargetId(exampleId);
+      setSourceNormalizedName('');
+      setTargetNormalizedName('');
     } else {
       setSourceId(exampleId);
       setTargetId('');
+      setSourceNormalizedName('');
+      setTargetNormalizedName('');
     }
   };
 
@@ -300,6 +405,55 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               <div className="w-2 h-2 rounded-full bg-violet-500" />
               Source Node
             </label>
+            
+            <div className="relative">
+              <input
+                type="text"
+                value={sourceId}
+                onChange={(e) => {
+                  setSourceId(e.target.value);
+                  setSourceNormalizedName('');
+                  handleSourceSearch(e.target.value);
+                }}
+                onFocus={() => sourceId.length >= 2 && sourceSuggestions.length > 0 && setShowSourceDropdown(true)}
+                onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
+                placeholder="Type name or CURIE (e.g., Alzheimer or MONDO:0004975)"
+                className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
+              />
+              {isNormalizingSource && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
+              )}
+              
+              {/* Autocomplete Dropdown */}
+              {showSourceDropdown && sourceSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {sourceSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={() => selectSourceSuggestion(suggestion)}
+                      className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-purple-50 last:border-0"
+                    >
+                      <div className="font-medium text-slate-900 text-sm">{suggestion.label}</div>
+                      <div className="text-xs text-slate-500 font-mono mt-1">{suggestion.curie}</div>
+                      {suggestion.types && suggestion.types.length > 0 && (
+                        <div className="text-xs text-purple-600 mt-1">
+                          {suggestion.types[0].replace('biolink:', '')}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {sourceNormalizedName && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <Search className="w-4 h-4 text-green-600" />
+                <span className="text-sm text-green-700 font-medium">{sourceNormalizedName}</span>
+              </div>
+            )}
+            
             <select
               value={sourceCategory}
               onChange={(e) => setSourceCategory(e.target.value)}
@@ -311,13 +465,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              value={sourceId}
-              onChange={(e) => setSourceId(e.target.value)}
-              placeholder="Leave blank to find sources..."
-              className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 font-mono text-sm"
-            />
           </div>
 
           {/* Target Node */}
@@ -326,6 +473,55 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               <div className="w-2 h-2 rounded-full bg-fuchsia-500" />
               Target Node
             </label>
+            
+            <div className="relative">
+              <input
+                type="text"
+                value={targetId}
+                onChange={(e) => {
+                  setTargetId(e.target.value);
+                  setTargetNormalizedName('');
+                  handleTargetSearch(e.target.value);
+                }}
+                onFocus={() => targetId.length >= 2 && targetSuggestions.length > 0 && setShowTargetDropdown(true)}
+                onBlur={() => setTimeout(() => setShowTargetDropdown(false), 200)}
+                placeholder="Type name or CURIE (e.g., dopamine or CHEBI:18243)"
+                className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
+              />
+              {isNormalizingTarget && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
+              )}
+              
+              {/* Autocomplete Dropdown */}
+              {showTargetDropdown && targetSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {targetSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={() => selectTargetSuggestion(suggestion)}
+                      className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-purple-50 last:border-0"
+                    >
+                      <div className="font-medium text-slate-900 text-sm">{suggestion.label}</div>
+                      <div className="text-xs text-slate-500 font-mono mt-1">{suggestion.curie}</div>
+                      {suggestion.types && suggestion.types.length > 0 && (
+                        <div className="text-xs text-purple-600 mt-1">
+                          {suggestion.types[0].replace('biolink:', '')}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {targetNormalizedName && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <Search className="w-4 h-4 text-green-600" />
+                <span className="text-sm text-green-700 font-medium">{targetNormalizedName}</span>
+              </div>
+            )}
+            
             <select
               value={targetCategory}
               onChange={(e) => setTargetCategory(e.target.value)}
@@ -337,13 +533,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              placeholder="Leave blank to find targets..."
-              className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 font-mono text-sm"
-            />
           </div>
         </div>
 
@@ -495,7 +684,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
       <div className="flex items-start gap-2 px-4 py-3 bg-purple-50 rounded-xl border border-purple-100">
         <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-purple-700">
-          Provide exactly <strong>one CURIE</strong> (either source or target). The system will infer the matching nodes.
+          Type a <strong>name or CURIE</strong> in either source or target field. Suggestions will appear as you type!
         </p>
       </div>
     </div>

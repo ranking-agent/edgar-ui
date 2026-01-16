@@ -90,17 +90,39 @@ export const Login: React.FC = () => {
               {/* Feature highlights */}
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Drug Repurposing', value: 'AI-Powered' },
+                  { label: 'Drug Repurposing', value: 'Graph-Based' },
                   { label: 'Gene Discovery', value: 'Graph-Based' },
                   { label: 'Pathway Analysis', value: 'Statistical' },
-                  { label: 'Knowledge Graphs', value: '50M+ Nodes' },
-                ].map((item, idx) => (
-                  <div key={idx} className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                    <div className="text-xs text-purple-400 uppercase tracking-wider mb-1">{item.value}</div>
-                    <div className="text-white font-medium">{item.label}</div>
-                  </div>
-                ))}
+                  {
+                    label: 'ROBOKOP Knowledge Graphs',
+                    value: 'Nodes: 10M; Edges: 130M',
+                    href: 'https://robokop.renci.org/explore/graphs',
+                  },
+                ].map((item, idx) => {
+                  const content = (
+                    <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                      <div className="text-xs text-purple-400 uppercase tracking-wider mb-1">
+                        {item.value}
+                      </div>
+                      <div className="text-white font-medium">{item.label}</div>
+                    </div>
+                  );
+
+                  return item.href ? (
+                    <a
+                      key={idx}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <div key={idx}>{content}</div>
+                  );
+                })}
               </div>
+
             </div>
 
             <div className="text-purple-400/60 text-sm">

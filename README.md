@@ -156,7 +156,6 @@ Ask for the demo credentials to access the application.
 <!-- ### WebSocket
 - `WS /ws/job/{job_id}` - Real-time job updates -->
 
-See full API documentation at http://localhost:8000/api/docs
 
 ## TRAPI Query Format
 
