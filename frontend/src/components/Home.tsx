@@ -14,14 +14,8 @@ import {
   Activity,
   FlaskConical,
   ArrowRight,
-  Sparkles,
   ExternalLink,
-  Network,
-  Combine,
-  Layers,
-  Microscope,
-  Stethoscope,
-  ArrowRightLeft
+  Network
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Dashboard } from './Dashboard';
@@ -93,63 +87,158 @@ export const Home: React.FC = () => {
       />
 
       {/* Header */}
-      <header className="relative bg-white/80 backdrop-blur-xl border-b border-purple-100/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Logo with gradient */}
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-xl blur-lg opacity-40" />
-                <div className="relative w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-                  <Database className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
-                  EDGAR - Enrichment-Driven Graph Reasoner
-                </h1>
-              </div>
-            </div>
+      <header className="relative sticky top-0 z-50">
+        {/* Full-width Title Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-700">
+          {/* Decorative pattern overlay - diagonal stripes */}
+          <div 
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: `
+                repeating-linear-gradient(
+                  -45deg,
+                  transparent,
+                  transparent 8px,
+                  rgba(255,255,255,0.1) 8px,
+                  rgba(255,255,255,0.1) 16px
+                )
+              `,
+            }}
+          />
+          {/* Hexagon/molecular pattern */}
+          <div 
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5L52 17.5V42.5L30 55L8 42.5V17.5L30 5Z' fill='none' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E")`,
+              backgroundSize: '40px 40px',
+            }}
+          />
+          
+          {/* LEFT SIDE DECORATION - Knowledge graph nodes */}
+          <div className="absolute left-0 top-0 bottom-0 w-64 pointer-events-none overflow-hidden">
+            {/* Connected nodes visualization */}
+            <svg className="absolute -left-8 top-1/2 -translate-y-1/2 w-56 h-32 opacity-20" viewBox="0 0 200 100">
+              {/* Nodes */}
+              <circle cx="30" cy="50" r="8" fill="white" />
+              <circle cx="70" cy="25" r="6" fill="white" />
+              <circle cx="75" cy="70" r="5" fill="white" />
+              <circle cx="120" cy="40" r="7" fill="white" />
+              <circle cx="110" cy="80" r="4" fill="white" />
+              <circle cx="160" cy="55" r="6" fill="white" />
+              <circle cx="155" cy="20" r="5" fill="white" />
+              {/* Edges */}
+              <line x1="30" y1="50" x2="70" y2="25" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="30" y1="50" x2="75" y2="70" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="70" y1="25" x2="120" y2="40" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="75" y1="70" x2="120" y2="40" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="75" y1="70" x2="110" y2="80" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="120" y1="40" x2="160" y2="55" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="120" y1="40" x2="155" y2="20" stroke="white" strokeWidth="1.5" opacity="0.6" />
+              <line x1="160" y1="55" x2="155" y2="20" stroke="white" strokeWidth="1.5" opacity="0.6" />
+            </svg>
+            {/* Gradient fade */}
+            <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-r from-transparent to-purple-700/50" />
+          </div>
 
+          {/* RIGHT SIDE DECORATION - DNA helix / abstract bio pattern */}
+          <div className="absolute right-0 top-0 bottom-0 w-72 pointer-events-none overflow-hidden">
+            {/* Gradient fade */}
+            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-l from-transparent to-purple-700/50 z-10" />
+            {/* DNA-like helix */}
+            <svg className="absolute -right-4 top-1/2 -translate-y-1/2 w-64 h-36 opacity-15" viewBox="0 0 240 120">
+              {/* Double helix strands */}
+              <path 
+                d="M20 60 Q50 20, 80 60 T140 60 T200 60 T260 60" 
+                fill="none" 
+                stroke="white" 
+                strokeWidth="2"
+              />
+              <path 
+                d="M20 60 Q50 100, 80 60 T140 60 T200 60 T260 60" 
+                fill="none" 
+                stroke="white" 
+                strokeWidth="2"
+              />
+              {/* Cross rungs */}
+              <line x1="35" y1="42" x2="35" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="50" y1="30" x2="50" y2="90" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="65" y1="42" x2="65" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="95" y1="42" x2="95" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="110" y1="30" x2="110" y2="90" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="125" y1="42" x2="125" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="155" y1="42" x2="155" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="170" y1="30" x2="170" y2="90" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              <line x1="185" y1="42" x2="185" y2="78" stroke="white" strokeWidth="1.5" opacity="0.7" />
+              {/* Base pair dots */}
+              <circle cx="35" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="50" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="65" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="95" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="110" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="125" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="155" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="170" cy="60" r="3" fill="white" opacity="0.8" />
+              <circle cx="185" cy="60" r="3" fill="white" opacity="0.8" />
+            </svg>
+          </div>
+
+          {/* Center glow accents */}
+          <div className="absolute top-0 left-1/3 w-64 h-full bg-white/5 blur-3xl rounded-full" />
+          <div className="absolute bottom-0 right-1/3 w-48 h-full bg-indigo-400/10 blur-2xl rounded-full" />
+          
+          {/* Content */}
+          <div className="relative max-w-7xl mx-auto px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h1 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Source Serif 6', Georgia, serif" }}>
+                  EDGAR
+                </h1>
+                <span className="hidden sm:block w-px h-6 bg-white/30" />
+                <span className="hidden sm:block text-sm font-medium text-purple-100">
+                  Enrichment-Driven Graph Reasoner
+                </span>
+              </div>
+              
+              {/* Sign out in banner */}
+              <button
+                onClick={handleLogout} 
+                className="flex items-center gap-2 px-3 py-1.5 text-purple-200 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 text-sm font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="max-w-7xl mx-auto px-6 pb-4">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1 scrollbar-hide">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentPage === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentPage(item.id)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap 
-                    transition-all duration-200 text-sm
-                    ${isActive 
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25' 
-                      : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50'
-                    }
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                  {item.label}
-                </button>
-              );
-            })} 
-            <button
-              onClick={handleLogout} 
-              className="flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 hover:bg-purple-50 rounded-lg transition-all duration-200 font-medium bg-gradient-to-r from-pink-100 to-red-100"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign out</span>
-            </button>
+        {/* Navigation Bar */}
+        <nav className="bg-white/80 backdrop-blur-xl border-b border-purple-100/60">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setCurrentPage(item.id)}
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap 
+                      transition-all duration-200 text-sm
+                      ${isActive 
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25' 
+                        : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50'
+                      }
+                    `}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {item.label}
+                  </button>
+                );
+              })} 
+            </div>
           </div>
-          
         </nav>
-
-        
       </header>
 
       {/* Main Content */}

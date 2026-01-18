@@ -58,7 +58,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Main Content Grid */}
-      <div className={`grid gap-6 transition-all duration-300 ${
+      <div className={`grid gap-8 transition-all duration-300 ${
         queryBuilderExpanded ? 'lg:grid-cols-2' : 'grid-cols-1'
       }`}>
         {/* Left Column - Query Builder & Job Status */}
