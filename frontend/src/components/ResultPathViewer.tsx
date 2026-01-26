@@ -736,6 +736,7 @@ function extractResultSubgraph(
               source: edge.subject,
               target: edge.object,
               predicate: edge.predicate,
+              qualifier: edge.qualifier,
               edgeType: 'main',
               attributes: edge.attributes,
               sources: edge.sources
@@ -767,6 +768,7 @@ function extractResultSubgraph(
                         source: supportEdge.subject,
                         target: supportEdge.object,
                         predicate: supportEdge.predicate,
+                        qualifier: supportEdge.qualifier,
                         edgeType: 'support',
                         attributes: supportEdge.attributes,
                         sources: supportEdge.sources
@@ -865,6 +867,7 @@ function extractResultSubgraph(
                   source: nestedEdge.subject,
                   target: nestedEdge.object,
                   predicate: nestedEdge.predicate,
+                  qualifier: nestedEdge.qualifier,
                   edgeType: 'support',
                   attributes: nestedEdge.attributes,
                   sources: nestedEdge.sources,
@@ -1044,6 +1047,7 @@ function convertToCytoscapeFormat(subgraph: any) {
         label: predicateLabel,
         type: 'edge',
         predicate: edge.predicate,
+        qualifier: edge.qualifier,
         edgeType: edge.edgeType,
         sources: edge.sources,
         attributes: edge.attributes,

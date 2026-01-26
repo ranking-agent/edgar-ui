@@ -47,15 +47,28 @@ const NodeChip: React.FC<{
   );
 };
 
-// Edge Chip Component - matches stats card style
-const EdgeChip: React.FC<{ label: string }> = ({ label }) => (
-  <div className="inline-flex items-center px-3 py-1.5 bg-purple-50 border-2 border-purple-300 rounded-lg">
-    <span className="text-sm font-medium text-purple-700">{label}</span>
+// Edge Chip Component - shows predicate with directional arrow
+const EdgeChip: React.FC<{ label: string; direction?: 'left' | 'right' }> = ({ label, direction = 'right' }) => (
+  <div className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 border-2 border-purple-300 rounded-lg">
+    {direction === 'left' ? (
+      <>
+        <span className="text-purple-400">←</span>
+        <span className="text-sm font-medium text-purple-700">{label}</span>
+        <span className="text-purple-400">←</span>
+      </>
+    ) : (
+      <>
+        <span className="text-purple-400">→</span>
+        <span className="text-sm font-medium text-purple-700">{label}</span>
+        <span className="text-purple-400">→</span>
+      </>
+    )}
   </div>
 );
 
 interface ResultsViewerProps {
-  jobId: string;
+  jobId?: string;           // Used when fetching from API (Dashboard)
+  directData?: any;         // Used when data is already loaded (BYOResponseData)
   onResultsLoad?: (results: any) => void;
   onTabChange?: (tab: string) => void;
   onRuleSelect?: (ruleKey: string | null, resultIndices: number[]) => void;
@@ -74,7 +87,7 @@ interface EnrichmentRule {
   isEnrichmentSubject: boolean;
 }
 
-export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLoad, onTabChange, onRuleSelect }) => {
+export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData, onResultsLoad, onTabChange, onRuleSelect }) => {
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -87,6 +100,20 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
   const [expandedSupportGraphs, setExpandedSupportGraphs] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
+    // If directData is provided, use it directly (BYOResponseData case)
+    if (directData) {
+      setResults(directData);
+      setLoading(false);
+      onResultsLoad?.(directData);
+      return;
+    }
+
+    // Otherwise, fetch from API using jobId (Dashboard case)
+    if (!jobId) {
+      setLoading(false);
+      return;
+    }
+
     const fetchResults = async () => {
       try {
         const data = await enrichmentAPI.getResults(jobId);
@@ -101,7 +128,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     };
 
     fetchResults();
-  }, [jobId]);
+  }, [jobId, directData]);
 
   const downloadResults = () => {
     const dataStr = JSON.stringify(results, null, 2);
@@ -109,8 +136,9 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `edgar-results-${jobId}.json`;
+    link.download = jobId ? `edgar-results-${jobId}.json` : 'edgar-results.json';
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   const toggleResultExpansion = (index: number) => {
@@ -165,7 +193,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
   const queryInputIds = new Set<string>();
   let queryGraphPredicate = '';
   let querySubjectIsInput = true;
-  let outputCategory = ''
+  let outputCategory: string[] = [];
   
   Object.values(queryGraph.nodes).forEach((node: any) => {
     if (node.ids) {
@@ -179,12 +207,16 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     }
     const subjectNode = queryGraph.nodes[edge.subject];
     const objectNode = queryGraph.nodes[edge.object];
+    
+    // Determine which node is input (has ids) and which is output (no ids)
     if (subjectNode?.ids?.some((id: string) => queryInputIds.has(id))) {
       querySubjectIsInput = true;
-      outputCategory = subjectNode?.categories
+      // Output is the OBJECT node (the one we're searching for)
+      outputCategory = objectNode?.categories || [];
     } else if (objectNode?.ids?.some((id: string) => queryInputIds.has(id))) {
       querySubjectIsInput = false;
-      outputCategory = objectNode?.categories
+      // Output is the SUBJECT node (the one we're searching for)
+      outputCategory = subjectNode?.categories || [];
     }
   });
 
@@ -214,10 +246,14 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
               const memberId = auxEdge.subject;
               const memberNode = knowledgeGraph.nodes?.[memberId];
               if (!lookupSetMembers.has(memberId)) {
+                // Try outputCategory first, then fall back to node's categories from KG
+                const category = outputCategory?.[0]?.replace('biolink:', '') 
+                  || memberNode?.categories?.[0]?.replace('biolink:', '') 
+                  || '';
                 lookupSetMembers.set(memberId, {
                   nodeId: memberId,
                   nodeName: memberNode?.name || memberId,
-                  category: outputCategory?.[0]?.replace('biolink:', '') || '',
+                  category,
                 });
               }
             }
@@ -228,10 +264,14 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
               const memberNode = knowledgeGraph.nodes?.[memberId];
               
               if (memberNode && !memberId.startsWith('uuid:')) {
+                // Try outputCategory first, then fall back to node's categories from KG
+                const category = outputCategory?.[0]?.replace('biolink:', '') 
+                  || memberNode?.categories?.[0]?.replace('biolink:', '') 
+                  || '';
                 lookupSetMembers.set(memberId, {
                   nodeId: memberId,
                   nodeName: memberNode?.name || memberId,
-                  category: outputCategory?.[0]?.replace('biolink:', '') || '',
+                  category,
                   predicate: auxEdge.predicate?.replace('biolink:', '') || queryGraphPredicate,
                 });
               }
@@ -349,10 +389,16 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
           if (minPValue === Infinity) return;
 
           // Determine if enrichment node is subject or object
+          // isEnrichmentSubject = true means: enrichmentNode --predicate--> uuid (lookup set)
+          // isEnrichmentSubject = false means: uuid (lookup set) --predicate--> enrichmentNode
           const isEnrichmentSubject = !edge.subject?.startsWith('uuid:');
+          
+          // ruleKey format: subject→predicate→object direction
+          // When enrichment is subject: enrichmentNode→predicate (points to lookup set)
+          // When enrichment is object: predicate→enrichmentNode (lookup set points to it)
           const ruleKey = isEnrichmentSubject 
-            ? `${enrichmentNodeId}→${predicate}`
-            : `${predicate}→${enrichmentNodeId}`;
+            ? `${enrichmentNodeId}→${predicate}→lookup`
+            : `lookup→${predicate}→${enrichmentNodeId}`;
 
           if (!enrichmentRulesMap.has(ruleKey)) {
             enrichmentRulesMap.set(ruleKey, {
@@ -405,13 +451,18 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const edges = auxGraph.edges || [];
     if (edges.length !== 3) return null;
 
-    // Find the three edges
+    // Find the three edges and track their directions
     let inputToLookupEdge: any = null;
     let lookupToEnrichmentEdge: any = null;
     let resultToEnrichmentEdge: any = null;
     let inputNodeids: any = null;
     let enrichmentNodeids: any = null;
     let resultNodeIds: any = null;
+    
+    // Track if input/lookup/enrichment/result is subject or object in each edge
+    let inputIsSubject = true;        // For inputToLookupEdge
+    let lookupIsSubjectToEnrichment = true;  // For lookupToEnrichmentEdge
+    let resultIsSubject = true;       // For resultToEnrichmentEdge
 
     edges.forEach((edgeId: string) => {
       const edge = knowledgeGraph?.edges[edgeId];
@@ -424,6 +475,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
       ) {
         inputToLookupEdge = edge;
         inputNodeids = queryInputIds.has(edge.subject) ? edge.subject : edge.object;
+        inputIsSubject = queryInputIds.has(edge.subject);
       }
       // Lookup Set to Enrichment
       else if ((edge.object?.startsWith('uuid:') && edge.attributes?.some((attr: any) => 
@@ -433,6 +485,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
       ))) {
         lookupToEnrichmentEdge = edge;
         enrichmentNodeids = edge.object?.startsWith('uuid:') ? edge.subject : edge.object;
+        lookupIsSubjectToEnrichment = edge.subject?.startsWith('uuid:');
       }
       // Result to Enrichment
       else if (!queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') &&
@@ -441,6 +494,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
         resultNodeIds = !queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') 
           ? edge.subject 
           : edge.object;
+        // Determine if result node is subject
+        resultIsSubject = edge.subject === resultNodeIds;
       }
     });
 
@@ -497,7 +552,10 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
 
       if (memberId && pValue !== null) {
         const memberNode = knowledgeGraph?.nodes[memberId];
-        const primaryCategory = outputCategory?.[0]?.replace('biolink:', '') || '';
+        // Try outputCategory first, then fall back to node's categories from KG
+        const primaryCategory = outputCategory?.[0]?.replace('biolink:', '') 
+          || memberNode?.categories?.[0]?.replace('biolink:', '') 
+          || '';
         connectedMembers.push({
           id: memberId,
           name: memberNode?.name || memberId,
@@ -540,6 +598,12 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
     const pred2 = lookupToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
     const pred3 = resultToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
 
+    // Determine arrow directions based on subject/object relationships
+    // Arrow points FROM subject TO object
+    // pred1: inputIsSubject ? input→lookup : input←lookup
+    // pred2: lookupIsSubjectToEnrichment ? lookup→enrichment : lookup←enrichment  
+    // pred3: resultIsSubject ? result→enrichment (shown as enrichment←result) : result←enrichment (shown as enrichment→result)
+
     return (
       <div key={sgId} className="bg-white border-2 border-gray-200 rounded-lg p-3">
         <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-3">
@@ -552,7 +616,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
               <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred1}</span>
               <div className="flex items-center" style={{ width: '100%' }}>
                 <div className="flex-1 border-t-2 border-purple-600"></div>
-                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+                <span className="text-purple-600 font-bold text-lg mx-1">{inputIsSubject ? '→' : '←'}</span>
               </div>
             </div>
             
@@ -572,7 +636,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
               <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred2}</span>
               <div className="flex items-center" style={{ width: '100%' }}>
                 <div className="flex-1 border-t-2 border-purple-600"></div>
-                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+                <span className="text-purple-600 font-bold text-lg mx-1">{lookupIsSubjectToEnrichment ? '→' : '←'}</span>
               </div>
             </div>
             
@@ -584,7 +648,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
               <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred3}</span>
               <div className="flex items-center" style={{ width: '100%' }}>
                 <div className="flex-1 border-t-2 border-purple-600"></div>
-                <span className="text-purple-600 font-bold text-lg mx-1">→</span>
+                <span className="text-purple-600 font-bold text-lg mx-1">{resultIsSubject ? '←' : '→'}</span>
               </div>
             </div>
             
@@ -980,9 +1044,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                       {/* Visual Path Display */}
                       <div className="flex items-center gap-2 mb-3 flex-wrap">
                         {rule.isEnrichmentSubject ? (
+                          /* EnrichmentNode is subject: LookupSet ← predicate ← EnrichmentNode */
                           <>
-                            <NodeChip name={rule.enrichmentNodeName} />
-                            <EdgeChip label={rule.predicate} />
                             <NodeChip 
                               name="Lookup Set"
                               members={Array.from(rule.connectedMembers).map(
@@ -994,8 +1057,11 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                                 expandedRuleMembers === rule.ruleKey ? null : rule.ruleKey
                               )}
                             />
+                            <EdgeChip label={rule.predicate} direction="left" />
+                            <NodeChip name={rule.enrichmentNodeName} />
                           </>
                         ) : (
+                          /* LookupSet is subject: LookupSet → predicate → EnrichmentNode */
                           <>
                             <NodeChip 
                               name="Lookup Set"
@@ -1008,7 +1074,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, onResultsLo
                                 expandedRuleMembers === rule.ruleKey ? null : rule.ruleKey
                               )}
                             />
-                            <EdgeChip label={rule.predicate} />
+                            <EdgeChip label={rule.predicate} direction="right" />
                             <NodeChip name={rule.enrichmentNodeName} />
                           </>
                         )}

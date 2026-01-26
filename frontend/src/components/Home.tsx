@@ -1,22 +1,6 @@
 import React from 'react';
-import { 
-  LogOut, 
-  Database, 
-  Home as HomeIcon, 
-  BarChart3, 
-  AlignHorizontalDistributeCenter, 
-  Table, 
-  Upload, 
-  History,
-  GitGraph,
-  Dna,
-  Pill,
-  Activity,
-  FlaskConical,
-  ArrowRight,
-  ExternalLink,
-  Network
-} from 'lucide-react';
+import {LogOut, Database, Home as HomeIcon, BarChart3, AlignHorizontalDistributeCenter, Table, Upload, 
+  History, GitGraph, Dna, Pill, Activity, FlaskConical, ArrowRight, ExternalLink, Network} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Dashboard } from './Dashboard';
 import { EnrichmentAnalysis } from './EnrichmentAnalysis';
@@ -24,6 +8,7 @@ import { NormalizeNode } from './NormalizeNode';
 import { ResolveName } from './NameResolver';
 import { BYOResponseData } from './BYOResponseData';
 import { JobHistory } from './JobHistory';
+import { ScrollButtons } from './ScrollButtons';
 
 type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' | 'history';
 
@@ -85,6 +70,9 @@ export const Home: React.FC = () => {
           `,
         }}
       />
+
+      {/* Scroll Navigation Buttons */}
+      <ScrollButtons />
 
       {/* Header */}
       <header className="relative sticky top-0 z-50">
@@ -187,10 +175,10 @@ export const Home: React.FC = () => {
           <div className="absolute bottom-0 right-1/3 w-48 h-full bg-indigo-400/10 blur-2xl rounded-full" />
           
           {/* Content */}
-          <div className="relative max-w-7xl mx-auto px-6 py-5">
+          <div className="relative max-w-[1440px] mx-auto px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Source Serif 6', Georgia, serif" }}>
+                <h1 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
                   EDGAR
                 </h1>
                 <span className="hidden sm:block w-px h-6 bg-white/30" />
@@ -213,7 +201,7 @@ export const Home: React.FC = () => {
 
         {/* Navigation Bar */}
         <nav className="bg-white/80 backdrop-blur-xl border-b border-purple-100/60">
-          <div className="max-w-7xl mx-auto px-6 py-3">
+          <div className="max-w-[1440px] mx-auto px-6 py-3">
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
@@ -241,8 +229,8 @@ export const Home: React.FC = () => {
         </nav>
       </header>
 
-      {/* Main Content */}
-      <main className="relative flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+      {/* Main Content - Wider container */}
+      <main className="relative flex-1 max-w-[1440px] mx-auto px-6 py-8 w-full">
         {currentPage === 'home' && (
           <div className="space-y-8">
             {/* Hero Section */}
@@ -374,7 +362,7 @@ export const Home: React.FC = () => {
         {/* Top accent line */}
         <div className="h-1 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
         
-        <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="max-w-[1440px] mx-auto px-6 py-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Brand Column */}
             <div className="md:col-span-2">
@@ -389,7 +377,6 @@ export const Home: React.FC = () => {
               </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-md">
                 Enrichment-Driven Graph Reasoner for explainable biomedical knowledge graph inference. 
-                {/* Part of the NIH NCATS Biomedical Data Translator Consortium. */}
               </p>
             </div>
 
