@@ -296,7 +296,7 @@ export const ResultsList: React.FC<ResultsListProps> = ({ results }) => {
             
             {/* Result Node */}
             <span className="inline-flex items-center bg-indigo-100 border border-indigo-400 px-2 py-1 rounded font-semibold">
-              {resultNode?.name || resultNodeIds}  {/* ✅ FIXED: Changed from resultNodeId */}
+              {resultNode?.name || resultNodeIds}  
             </span>
           </div>
         </div>
@@ -304,8 +304,11 @@ export const ResultsList: React.FC<ResultsListProps> = ({ results }) => {
         {/* Expanded member details */}
         {isExpanded && connectedMembers.length > 0 && (
           <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3">
-            <div className="text-xs text-green-700 font-semibold mb-2">
+            <div className="flex items-center text-xs text-green-700 font-semibold mb-2">
               Connected {memberTypeLabel.charAt(0).toUpperCase() + memberTypeLabel.slice(1)} ({connectedMembers.length})
+              {connectedMembers?.[0]?.pValue !== undefined && (
+                <span className="inline-flex ml-auto"> : p = {connectedMembers[0].pValue.toExponential(2)}</span>
+              )}
             </div>
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {connectedMembers
@@ -325,9 +328,9 @@ export const ResultsList: React.FC<ResultsListProps> = ({ results }) => {
                         {member.id}
                       </div>
                     </div>
-                    <div className="ml-2 text-xs font-mono text-green-700 font-semibold">
+                    {/* <div className="ml-2 text-xs font-mono text-green-700 font-semibold">
                       p={member.pValue.toExponential(2)}
-                    </div>
+                    </div> */}
                   </div>
                 ))}
             </div>

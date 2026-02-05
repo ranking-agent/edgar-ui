@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {Upload, FileJson, CheckCircle, AlertCircle, Download, Trash2, ChevronUp,ArrowLeft,Code2,Info} from 'lucide-react';
 import { ResultsViewer } from './ResultsViewer';
+import { EnrichmentResultsViewer } from './EnrichmentResultsViewer';
 
 interface TrapiResponse {
   message?: {
@@ -15,6 +16,27 @@ interface TrapiResponse {
   logs?: any[];
   [key: string]: any;
 }
+
+// Helper to detect result type: EDGAR (inferred) vs Enrichment (member_ids)
+const detectResultType = (response: TrapiResponse | null): 'edgar' | 'enrichment' | 'unknown' => {
+  if (!response?.message?.query_graph) return 'unknown';
+  
+  const queryGraph = response.message.query_graph;
+  
+  // Check for EDGAR (has knowledge_type: "inferred" on edges)
+  const hasInferredEdges = Object.values(queryGraph.edges || {}).some(
+    (edge: any) => edge.knowledge_type === 'inferred'
+  );
+  
+  // Check for Enrichment (has member_ids array on nodes)
+  const hasMemberIds = Object.values(queryGraph.nodes || {}).some(
+    (node: any) => Array.isArray(node.member_ids) && node.member_ids.length > 0
+  );
+  
+  if (hasInferredEdges) return 'edgar';
+  if (hasMemberIds) return 'enrichment';
+  return 'unknown';
+};
 
 export const BYOResponseData: React.FC = () => {
   const [response, setResponse] = useState<TrapiResponse | null>(null);
@@ -117,6 +139,9 @@ export const BYOResponseData: React.FC = () => {
   const resultCount = response?.message?.results?.length || 0;
   const nodeCount = Object.keys(response?.message?.knowledge_graph?.nodes || {}).length;
   const edgeCount = Object.keys(response?.message?.knowledge_graph?.edges || {}).length;
+  
+  // Detect result type for conditional rendering
+  const resultType = detectResultType(response);
 
   return (
     <div className="space-y-4">
@@ -211,6 +236,19 @@ export const BYOResponseData: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Detected Result Type */}
+                    <div className={`p-3 rounded-lg text-sm font-medium ${
+                      resultType === 'edgar' 
+                        ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                        : resultType === 'enrichment'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-gray-50 text-gray-800 border border-gray-200'
+                    }`}>
+                      Detected: {resultType === 'edgar' ? 'EDGAR (Inference) Results' : 
+                                 resultType === 'enrichment' ? 'Enrichment Analysis Results' : 
+                                 'Unknown Result Type'}
+                    </div>
+
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-purple-50 rounded-lg p-3 text-center">
@@ -263,23 +301,30 @@ export const BYOResponseData: React.FC = () => {
               <ul className="space-y-1 text-sm text-purple-800">
                 <li>• Upload TRAPI-compliant JSON response files</li>
                 <li>• Response must contain a "message" field</li>
-                <li>• Supports results from any TRAPI service</li>
-                <li>• Same visualization as live queries</li>
+                <li>• Supports EDGAR (inference) and Enrichment results</li>
+                <li>• Auto-detects result type for appropriate visualization</li>
               </ul>
             </div>
           </div>
         )}
 
-        {/* Right Column - Results Viewer */}
+        {/* Right Column - Results Viewer (conditionally rendered based on type) */}
         <div className={`space-y-6 ${!uploadPanelExpanded ? 'lg:col-span-1' : ''}`}>
           {response ? (
-            <ResultsViewer
-              // Pass data directly instead of jobId
-              directData={response}
-              onResultsLoad={() => {}}
-              onTabChange={() => {}}
-              onRuleSelect={handleRuleSelect}
-            />
+            // Conditionally render based on detected result type
+            resultType === 'enrichment' ? (
+              <EnrichmentResultsViewer
+                results={response}
+                onResultsLoad={() => {}}
+              />
+            ) : (
+              <ResultsViewer
+                directData={response}
+                onResultsLoad={() => {}}
+                onTabChange={() => {}}
+                onRuleSelect={handleRuleSelect}
+              />
+            )
           ) : (
             /* Empty State / Preview */
             <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">

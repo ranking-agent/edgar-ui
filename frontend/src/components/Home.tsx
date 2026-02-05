@@ -7,10 +7,10 @@ import { EnrichmentAnalysis } from './EnrichmentAnalysis';
 import { NormalizeNode } from './NormalizeNode';
 import { ResolveName } from './NameResolver';
 import { BYOResponseData } from './BYOResponseData';
-import { JobHistory } from './JobHistory';
+// import { JobHistory } from './JobHistory';
 import { ScrollButtons } from './ScrollButtons';
 
-type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' | 'history';
+type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' ;
 
 export const Home: React.FC = () => {
   const { logout } = useAuth();
@@ -27,7 +27,7 @@ export const Home: React.FC = () => {
     { id: 'normalize' as Page, label: 'Normalize Node', icon: AlignHorizontalDistributeCenter },
     { id: 'lookup' as Page, label: 'Resolve Name', icon: Table },
     { id: 'byo' as Page, label: 'Import Data', icon: Upload },
-    { id: 'history' as Page, label: 'Job History', icon: History },
+    // { id: 'history' as Page, label: 'Job History', icon: History },
   ];
 
   const useCases = [
@@ -352,9 +352,9 @@ export const Home: React.FC = () => {
         {currentPage === 'normalize' && <NormalizeNode />}
         {currentPage === 'lookup' && <ResolveName />}
         {currentPage === 'byo' && <BYOResponseData />}
-        {currentPage === 'history' && <JobHistory onSelectJob={(jobId) => {
+        {/* {currentPage === 'history' && <JobHistory onSelectJob={(jobId) => {
           setCurrentPage('dashboard');
-        }} />}
+        }} />} */}
       </main>
 
       {/* ROBOKOP-style Dark Footer */}

@@ -660,8 +660,11 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
 
         {isExpanded && connectedMembers.length > 0 && (
           <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3">
-            <div className="text-xs text-green-700 font-semibold mb-2">
-              Connected {memberTypeLabel.charAt(0).toUpperCase() + memberTypeLabel.slice(1)} ({connectedMembers.length})
+            <div className="flex items-center text-xs text-green-700 font-semibold mb-2">
+              Connected {memberTypeLabel} ({connectedMembers.length})
+              {connectedMembers?.[0]?.pValue !== undefined && (
+                <span className="inline-flex ml-auto"> : p = {connectedMembers[0].pValue.toExponential(2)}</span>
+              )}
             </div>
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {connectedMembers
