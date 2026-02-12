@@ -230,7 +230,7 @@ export const Home: React.FC = () => {
       </header>
 
       {/* Main Content - Wider container */}
-      <main className="relative flex-1 max-w-[1440px] mx-auto px-6 py-8 w-full">
+      <main className="relative flex-1 max-w-[1800px] w-full mx-auto px-6 py-8">
         {currentPage === 'home' && (
           <div className="space-y-8">
             {/* Hero Section */}
@@ -358,14 +358,64 @@ export const Home: React.FC = () => {
       </main>
 
       {/* ROBOKOP-style Dark Footer */}
-      <footer className="relative mt-auto bg-gradient-to-b from-slate-900 to-slate-950 text-white">
+      <footer className="bg-gradient-to-r from-slate-900 to-slate-950 text-white">
         {/* Top accent line */}
-        <div className="h-1 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
+        <div className="h-0.5 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
+        
+        <div className="max-w-[1800px] mx-auto px-6 py-3">
+          <div className="flex items-center justify-between">
+            {/* Brand */}
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <Database className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold">EDGAR</span>
+                <span className="text-xs text-slate-500">v2.0.0</span>
+              </div>
+            </div>
+
+            {/* Links - inline */}
+            <div className="flex items-center gap-6">
+              <a href="https://robokop.renci.org" target="_blank" rel="noopener noreferrer"
+                 className="text-xs text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
+                ROBOKOP
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <a href="https://github.com/RobokopU24" target="_blank" rel="noopener noreferrer"
+                 className="text-xs text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
+                GitHub
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <a href="https://renci.org" target="_blank" rel="noopener noreferrer"
+                 className="text-xs text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
+                RENCI
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <a href="https://ncats.nih.gov/translator" target="_blank" rel="noopener noreferrer"
+                 className="text-xs text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
+                NCATS Translator
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            {/* Copyright */}
+            <div className="text-right">
+              <p className="text-xs text-slate-500">
+                Funded by NCATS Translator (OT2TR002514) and NIH U24ES035214 • © {new Date().getFullYear()} RENCI
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
+      {/* <footer className="relative mt-auto bg-gradient-to-b from-slate-900 to-slate-950 text-white">
+        {/* Top accent line */}
+        {/* <div className="h-1 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
         
         <div className="max-w-[1440px] mx-auto px-6 py-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Brand Column */}
-            <div className="md:col-span-2">
+            {/* <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
                   <Database className="w-5 h-5 text-white" />
@@ -378,10 +428,10 @@ export const Home: React.FC = () => {
               <p className="text-sm text-slate-400 leading-relaxed max-w-md">
                 Enrichment-Driven Graph Reasoner for explainable biomedical knowledge graph inference. 
               </p>
-            </div>
+            </div> */}
 
             {/* Links Column */}
-            <div>
+            {/* <div>
               <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Resources</h4>
               <ul className="space-y-2">
                 <li>
@@ -399,10 +449,10 @@ export const Home: React.FC = () => {
                   </a>
                 </li>
               </ul>
-            </div>
+            </div> */}
 
             {/* Consortium Column */}
-            <div>
+            {/* <div>
               <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Consortium</h4>
               <ul className="space-y-2">
                 <li>
@@ -420,23 +470,24 @@ export const Home: React.FC = () => {
                   </a>
                 </li>
               </ul>
-            </div>
-          </div>
+            </div> */}
+          {/* </div> */}
 
           {/* Bottom section with logos and copyright */}
-          <div className="mt-10 pt-8 border-t border-slate-800">
+          {/* <div className="mt-10 pt-8 border-t border-slate-800">
               {/* Copyright and funding */}
-              <div className="text-center md:flex-center">
+              {/* <div className="text-center md:flex-center">
                 <p className="text-xs text-slate-500">
                   Funded by NCATS Translator (OT2TR002514) and NIH U24ES035214
                 </p>
                 <p className="text-xs text-slate-600">
                   © {new Date().getFullYear()} RENCI, UNC Chapel Hill. All rights reserved.
                 </p>
-              </div>
-          </div>
-        </div>
-      </footer>
+              </div> */}
+          {/* </div>  */}
+        {/* </div>  */}
+      {/* </footer> */} 
+      
     </div>
   );
 };

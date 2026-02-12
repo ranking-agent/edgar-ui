@@ -13,13 +13,72 @@ import {
   AlertTriangle,
   Server,
   Wifi,
-  WifiOff
+  WifiOff,
+  Search,
+  GitBranch,
+  Sparkles,
+  FileCheck,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Package
 } from 'lucide-react';
 import { enrichmentAPI, createJobWebSocket } from '../utils/api';
 
 interface JobStatusProps {
   jobId: string;
   onComplete: (jobId: string) => void;
+}
+
+interface PipelineLog {
+  level: string;
+  message: string;
+  metadata?: {
+    total_lookups?: number;
+    total_enrichments?: number;
+    graph_enrichments?: number;
+    property_enrichments?: number;
+    total_inferences?: number;
+    unique_inferred_nodes?: number;
+    timing_seconds?: number;
+    pvalue_stats?: {
+      min: number;
+      max: number;
+    };
+    graph_inferences?: {
+      total: number;
+      unique: number;
+      enrichments_used: number;
+    };
+    property_inferences?: {
+      total: number;
+      unique: number;
+      enrichments_used: number;
+    };
+    timing?: {
+      total_seconds: number;
+      pruning_seconds?: number;
+    };
+    results?: {
+      total_before_filtering: number;
+      total_after_filtering: number;
+    };
+    scores?: {
+      min: number;
+      max: number;
+    };
+    enrichments?: {
+      before_pruning: number;
+      after_pruning: number;
+    };
+    knowledge_graph?: {
+      [key: string]: {
+        nodes: number;
+        edges: number;
+        aux_graphs: number;
+      };
+    };
+  };
 }
 
 interface JobData {
@@ -29,84 +88,68 @@ interface JobData {
   message: string;
   created_at?: string;
   completed_at?: string;
+  logs?: PipelineLog[];
 }
 
-// Map progress percentages to icons and descriptions
-const getProgressDetails = (progress: number, message: string) => {
-  // Check for error messages first
-  if (message.toLowerCase().includes('answercoalesce')) {
-    if (message.includes('502') || message.includes('server error')) {
-      return {
-        icon: Server,
-        label: 'External Service Error',
-        description: message,
-        isError: true,
-      };
-    }
-    if (message.includes('timeout') || message.includes('504')) {
-      return {
-        icon: Clock,
-        label: 'Request Timeout',
-        description: message,
-        isError: true,
-      };
-    }
-    if (message.includes('connect') || message.includes('down')) {
-      return {
-        icon: WifiOff,
-        label: 'Connection Failed',
-        description: message,
-        isError: true,
-      };
-    }
-  }
+// Pipeline stage configuration
+const PIPELINE_STAGES = [
+  { 
+    key: 'Lookup stage complete', 
+    label: 'Lookup', 
+    icon: Search,
+    color: 'blue',
+    description: 'Finding related entities in knowledge graph'
+  },
+  { 
+    key: 'Enrichment stage complete', 
+    label: 'Enrichment', 
+    icon: GitBranch,
+    color: 'purple',
+    description: 'Analyzing graph patterns and properties'
+  },
+  { 
+    key: 'Inference lookup complete', 
+    label: 'Inference', 
+    icon: Sparkles,
+    color: 'amber',
+    description: 'Generating inferred relationships'
+  },
+  { 
+    key: 'EDGAR finalization complete', 
+    label: 'Finalization', 
+    icon: FileCheck,
+    color: 'emerald',
+    description: 'Pruning and scoring results'
+  },
+  { 
+    key: 'Response build complete', 
+    label: 'Response', 
+    icon: Package,
+    color: 'indigo',
+    description: 'Building TRAPI response'
+  },
+];
 
-  // Progress-based stages
-  if (progress <= 20) {
-    return {
-      icon: Zap,
-      label: 'Initializing',
-      description: 'Preparing enrichment query...',
-      isError: false,
-    };
-  }
-  if (progress <= 30) {
-    return {
-      icon: Send,
-      label: 'Sending Request',
-      description: 'Sending query to AnswerCoalesce...',
-      isError: false,
-    };
-  }
-  if (progress <= 70) {
-    return {
-      icon: Loader2,
-      label: 'Processing',
-      description: 'Waiting for AnswerCoalesce response... This may take a few minutes for complex queries.',
-      isError: false,
-      animate: true,
-    };
-  }
-  if (progress <= 90) {
-    return {
-      icon: Download,
-      label: 'Receiving Results',
-      description: 'Processing response from AnswerCoalesce...',
-      isError: false,
-    };
-  }
-  return {
-    icon: Database,
-    label: 'Finalizing',
-    description: 'Storing results...',
-    isError: false,
-  };
+// Get stage status from logs
+const getStageStatus = (logs: PipelineLog[], stageKey: string) => {
+  const log = logs.find(l => l.message === stageKey);
+  if (!log) return { status: 'pending', log: null };
+  if (log.level === 'ERROR') return { status: 'error', log };
+  return { status: 'complete', log };
+};
+
+// Format number with appropriate precision
+const formatNumber = (num: number) => {
+  if (num < 0.0001) return num.toExponential(2);
+  if (num < 1) return num.toFixed(6);
+  return num.toLocaleString();
 };
 
 export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -224,12 +267,31 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
 
   const config = statusConfig[jobData.status as keyof typeof statusConfig] || statusConfig.queued;
   const Icon = config.icon;
-  const progressDetails = getProgressDetails(jobData.progress, jobData.message);
-  const ProgressIcon = progressDetails.icon;
 
-  // Check if the error is from AnswerCoalesce
-  const isAnswerCoalesceError = jobData.status === 'failed' && 
-    jobData.message.toLowerCase().includes('answercoalesce');
+  // Parse logs if available
+  const logs = jobData.logs || [];
+  const hasLogs = logs.length > 0;
+  
+  // Find error log if any
+  const errorLog = logs.find(l => l.level === 'ERROR');
+  
+  // Find the failed stage
+  const getFailedStage = () => {
+    if (!errorLog) return null;
+    const stage = PIPELINE_STAGES.find(s => errorLog.message.toLowerCase().includes(s.label.toLowerCase()));
+    return stage || { label: 'Unknown Stage', icon: AlertCircle, color: 'red' };
+  };
+
+  const failedStage = jobData.status === 'failed' ? getFailedStage() : null;
+
+  // Calculate total timing from logs
+  const getTotalTiming = () => {
+    return logs.reduce((total, log) => {
+      if (log.metadata?.timing_seconds) return total + log.metadata.timing_seconds;
+      if (log.metadata?.timing?.total_seconds) return total + log.metadata.timing.total_seconds;
+      return total;
+    }, 0);
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 overflow-hidden">
@@ -272,13 +334,6 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
               )}
             </div>
 
-            {/* Message - only show for non-running or if it's an important message */}
-            {jobData.message && (jobData.status !== 'running' || jobData.message.includes('error')) && (
-              <p className={`text-sm ${config.textColor} opacity-80 mb-4`}>
-                {jobData.message}
-              </p>
-            )}
-
             {/* Progress Bar */}
             {jobData.status === 'running' && (
               <div className="space-y-2">
@@ -291,7 +346,6 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
                     className={`absolute inset-y-0 left-0 bg-gradient-to-r ${config.gradient} rounded-full transition-all duration-500 ease-out`}
                     style={{ width: `${jobData.progress}%` }}
                   >
-                    {/* Animated shine effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
                   </div>
                 </div>
@@ -321,33 +375,291 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
         </div>
       </div>
 
-      {/* Detailed Progress Indicator for running jobs */}
-      {jobData.status === 'running' && (
-        <div className="px-6 pb-6">
-          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <ProgressIcon className={`w-5 h-5 text-white ${progressDetails.animate ? 'animate-spin' : ''}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-purple-800">
-                {progressDetails.label}
-              </div>
-              <div className="text-xs text-purple-600">
-                {progressDetails.description}
-              </div>
-            </div>
-            {jobData.progress >= 30 && jobData.progress < 80 && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-100 rounded-full">
-                <Wifi className="w-3 h-3 text-purple-500" />
-                <span className="text-xs text-purple-600 font-medium">Connected</span>
-              </div>
+      {/* Pipeline Stages Visualization */}
+      {hasLogs && (
+        <div className="px-6 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-slate-700">EDGAR Pipeline</h4>
+            {jobData.status === 'completed' && (
+              <span className="text-xs text-slate-500">
+                Total: {getTotalTiming().toFixed(2)}s
+              </span>
             )}
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {PIPELINE_STAGES.map((stage, idx) => {
+              const { status, log } = getStageStatus(logs, stage.key);
+              const StageIcon = stage.icon;
+              
+              const bgColor = status === 'complete' 
+                ? `bg-${stage.color}-500` 
+                : status === 'error' 
+                  ? 'bg-red-500' 
+                  : 'bg-slate-200';
+              
+              const iconColor = status === 'pending' ? 'text-slate-400' : 'text-white';
+              
+              return (
+                <React.Fragment key={stage.key}>
+                  <div className="flex flex-col items-center flex-1 group relative">
+                    <div 
+                      className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center transition-all ${
+                        status === 'error' ? 'ring-2 ring-red-300 ring-offset-2' : ''
+                      }`}
+                      title={stage.description}
+                    >
+                      {status === 'error' ? (
+                        <XCircle className="w-5 h-5 text-white" />
+                      ) : (
+                        <StageIcon className={`w-5 h-5 ${iconColor}`} />
+                      )}
+                    </div>
+                    <span className={`text-xs mt-1.5 font-medium ${
+                      status === 'error' ? 'text-red-600' : 
+                      status === 'complete' ? 'text-slate-700' : 'text-slate-400'
+                    }`}>
+                      {stage.label}
+                    </span>
+                    {log?.metadata?.timing_seconds && (
+                      <span className="text-xs text-slate-400">
+                        {log.metadata.timing_seconds.toFixed(2)}s
+                      </span>
+                    )}
+                    {log?.metadata?.timing?.total_seconds && (
+                      <span className="text-xs text-slate-400">
+                        {log.metadata.timing.total_seconds.toFixed(2)}s
+                      </span>
+                    )}
+                  </div>
+                  {idx < PIPELINE_STAGES.length - 1 && (
+                    <div className={`h-0.5 flex-1 ${
+                      getStageStatus(logs, PIPELINE_STAGES[idx + 1].key).status !== 'pending'
+                        ? `bg-${stage.color}-300`
+                        : 'bg-slate-200'
+                    }`} />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* AnswerCoalesce Error Details */}
-      {isAnswerCoalesceError && (
+      {/* Failed Stage Error Details */}
+      {jobData.status === 'failed' && errorLog && (
+        <div className="px-6 pb-6">
+          <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-red-800 mb-1">
+                {failedStage ? `Error in ${failedStage.label} Stage` : 'Pipeline Error'}
+              </div>
+              <div className="text-xs text-red-700 mb-2">
+                {errorLog.message}
+              </div>
+              {errorLog.metadata && (
+                <pre className="text-xs bg-red-100 text-red-800 p-2 rounded-lg overflow-x-auto">
+                  {JSON.stringify(errorLog.metadata, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Logs Toggle */}
+      {hasLogs && jobData.status === 'completed' && (
+        <div className="px-6 pb-6">
+          <button
+            onClick={() => setShowLogs(!showLogs)}
+            className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 font-medium transition-colors"
+          >
+            {showLogs ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {showLogs ? 'Hide' : 'Show'} Detailed Logs
+          </button>
+
+          {showLogs && (
+            <div className="mt-4 space-y-3">
+              {logs.map((log, idx) => {
+                const stage = PIPELINE_STAGES.find(s => s.key === log.message);
+                const StageIcon = stage?.icon || Activity;
+                const isError = log.level === 'ERROR';
+                
+                return (
+                  <div 
+                    key={idx}
+                    className={`p-4 rounded-xl border ${
+                      isError 
+                        ? 'bg-red-50 border-red-200' 
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        isError ? 'bg-red-500' : 'bg-purple-500'
+                      }`}>
+                        <StageIcon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className={`text-sm font-semibold ${isError ? 'text-red-800' : 'text-slate-800'}`}>
+                          {log.message}
+                        </div>
+                        <div className={`text-xs ${isError ? 'text-red-600' : 'text-slate-500'}`}>
+                          {log.level}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {log.metadata && (
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {/* Lookup Stage */}
+                        {log.metadata.total_lookups !== undefined && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Total Lookups</div>
+                            <div className="text-sm font-semibold text-slate-800">
+                              {log.metadata.total_lookups}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Enrichment Stage */}
+                        {log.metadata.total_enrichments !== undefined && (
+                          <>
+                            <div className="bg-white p-2 rounded-lg border border-slate-200">
+                              <div className="text-xs text-slate-500">Total Enrichments</div>
+                              <div className="text-sm font-semibold text-slate-800">
+                                {log.metadata.total_enrichments}
+                              </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg border border-slate-200">
+                              <div className="text-xs text-slate-500">Graph / Property</div>
+                              <div className="text-sm font-semibold text-slate-800">
+                                {log.metadata.graph_enrichments} / {log.metadata.property_enrichments}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {log.metadata.pvalue_stats && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">P-value Range</div>
+                            <div className="text-xs font-mono text-slate-800">
+                              {formatNumber(log.metadata.pvalue_stats.min)} - {formatNumber(log.metadata.pvalue_stats.max)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Inference Stage */}
+                        {log.metadata.total_inferences !== undefined && (
+                          <>
+                            <div className="bg-white p-2 rounded-lg border border-slate-200">
+                              <div className="text-xs text-slate-500">Total Inferences</div>
+                              <div className="text-sm font-semibold text-slate-800">
+                                {log.metadata.total_inferences.toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg border border-slate-200">
+                              <div className="text-xs text-slate-500">Unique Inferred</div>
+                              <div className="text-sm font-semibold text-slate-800">
+                                {log.metadata.unique_inferred_nodes?.toLocaleString()}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {log.metadata.graph_inferences && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Graph Inferences</div>
+                            <div className="text-xs text-slate-800">
+                              {log.metadata.graph_inferences.unique} unique / {log.metadata.graph_inferences.total} total
+                            </div>
+                          </div>
+                        )}
+                        
+                        {log.metadata.property_inferences && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Property Inferences</div>
+                            <div className="text-xs text-slate-800">
+                              {log.metadata.property_inferences.unique} unique / {log.metadata.property_inferences.total} total
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Finalization Stage */}
+                        {log.metadata.results && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Results</div>
+                            <div className="text-sm font-semibold text-slate-800">
+                              {log.metadata.results.total_after_filtering.toLocaleString()}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {log.metadata.scores && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Score Range</div>
+                            <div className="text-xs font-mono text-slate-800">
+                              {log.metadata.scores.min.toFixed(4)} - {log.metadata.scores.max.toFixed(4)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {log.metadata.enrichments && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Enrichments (after pruning)</div>
+                            <div className="text-sm font-semibold text-slate-800">
+                              {log.metadata.enrichments.after_pruning}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Timing */}
+                        {(log.metadata.timing_seconds || log.metadata.timing?.total_seconds) && (
+                          <div className="bg-white p-2 rounded-lg border border-slate-200">
+                            <div className="text-xs text-slate-500">Timing</div>
+                            <div className="text-sm font-semibold text-slate-800">
+                              {(log.metadata.timing_seconds || log.metadata.timing?.total_seconds)?.toFixed(3)}s
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Running status - show current stage */}
+      {jobData.status === 'running' && !hasLogs && (
+        <div className="px-6 pb-6">
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-purple-800">
+                Processing Query
+              </div>
+              <div className="text-xs text-purple-600">
+                {jobData.message || 'Running EDGAR pipeline...'}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-100 rounded-full">
+              <Wifi className="w-3 h-3 text-purple-500" />
+              <span className="text-xs text-purple-600 font-medium">Connected</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AnswerCoalesce Error Details - when no logs available */}
+      {jobData.status === 'failed' && !hasLogs && jobData.message?.toLowerCase().includes('answercoalesce') && (
         <div className="px-6 pb-6">
           <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -374,8 +686,8 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
         </div>
       )}
 
-      {/* Generic Error Details (non-AnswerCoalesce) */}
-      {jobData.status === 'failed' && !isAnswerCoalesceError && (
+      {/* Generic Error Details - when no logs and not AnswerCoalesce error */}
+      {jobData.status === 'failed' && !hasLogs && !jobData.message?.toLowerCase().includes('answercoalesce') && (
         <div className="px-6 pb-6">
           <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
             <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -386,7 +698,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
                 Analysis Failed
               </div>
               <div className="text-xs text-red-700">
-                {jobData.message}
+                {jobData.message || 'An unknown error occurred'}
               </div>
             </div>
           </div>

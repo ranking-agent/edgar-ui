@@ -1,4 +1,696 @@
-import React, { useState, useEffect } from 'react';
+// import React, { useState, useEffect } from 'react';
+// import { 
+//   Search, 
+//   Info, 
+//   Settings2, 
+//   ChevronDown, 
+//   ChevronUp, 
+//   Play,
+//   Lightbulb,
+//   Loader2,
+//   AlertCircle,
+// } from 'lucide-react';
+// import { enrichmentAPI, PREDICATES, NODE_CATEGORIES, ASPECT_QUALIFIERS, DIRECTION_QUALIFIERS } from '../utils/api';
+
+// const EXAMPLE_QUERIES = [
+//   {
+//     label: 'Drugs that treat a Disease',
+//     description: 'e.g., MONDO:0004975 (Alzheimer disease)',
+//     value: 'biolink:Drug-biolink:treats-biolink:Disease',
+//     example: 'MONDO:0004975',
+//     exampleIsTarget: true
+//   },
+//   {
+//     label: 'Genes associated with a Disease',
+//     description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
+//     value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
+//     example: 'DOID:0050430',
+//     exampleIsTarget: true
+//   },
+//   {
+//     label: 'Phenotypes of a Disease',
+//     description: 'e.g., MONDO:0005147 (Type 1 diabetes)',
+//     value: 'biolink:Disease-biolink:has_phenotype-biolink:PhenotypicFeature',
+//     example: 'MONDO:0005147',
+//     exampleIsTarget: false
+//   },
+//   {
+//     label: 'Genes affecting a Phenotype',
+//     description: 'e.g., HP:0003637 (Myasthenia)',
+//     value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
+//     example: 'HP:0003637',
+//     exampleIsTarget: true
+//   },
+//   {
+//     label: 'Phenotypes of a Gene',
+//     description: 'e.g., NCBIGene:122481',
+//     value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
+//     example: 'NCBIGene:122481',
+//     exampleIsTarget: false
+//   }
+// ];
+
+// interface QueryBuilderProps {
+//   onJobCreated: (jobId: string) => void;
+//   onQueryPreview?: (query: any) => void; 
+// }
+
+// // Helper function to debounce
+// function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+//   let timeout: NodeJS.Timeout;
+//   return (...args: Parameters<T>) => {
+//     clearTimeout(timeout);
+//     timeout = setTimeout(() => func(...args), wait);
+//   };
+// }
+
+// export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQueryPreview }) => {
+//   const [sourceId, setSourceId] = useState('');
+//   const [targetId, setTargetId] = useState('');
+//   const [sourceCategory, setSourceCategory] = useState('biolink:Disease');
+//   const [targetCategory, setTargetCategory] = useState('biolink:Drug');
+//   const [predicate, setPredicate] = useState('biolink:treats');
+//   const [aspectQualifier, setAspectQualifier] = useState('');
+//   const [directionQualifier, setDirectionQualifier] = useState('');
+//   const [showParameters, setShowParameters] = useState(false);
+//   const [pvalueThreshold, setPvalueThreshold] = useState('1e-5');
+//   const [resultLength, setResultLength] = useState('100');
+//   const [predicatesToExclude, setPredicatesToExclude] = useState('causes, biomarker_for, contraindicated_for, contraindicated_in, contributes_to, has_adverse_event, causes_adverse_event, treats_or_applied_or_studied_to_treat');
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState('');
+//   const [selectedExample, setSelectedExample] = useState<number | null>(null);
+
+//   // Name resolution states
+//   const [isNormalizingSource, setIsNormalizingSource] = useState(false);
+//   const [isNormalizingTarget, setIsNormalizingTarget] = useState(false);
+//   const [sourceNormalizedName, setSourceNormalizedName] = useState('');
+//   const [targetNormalizedName, setTargetNormalizedName] = useState('');
+//   const [sourceSuggestions, setSourceSuggestions] = useState<any[]>([]);
+//   const [targetSuggestions, setTargetSuggestions] = useState<any[]>([]);
+//   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+//   const [showTargetDropdown, setShowTargetDropdown] = useState(false);
+
+//   // Autocomplete search function
+//   const searchNodes = async (query: string): Promise<any[]> => {
+//     if (!query || query.length < 2) return [];
+    
+//     try {
+//       const response = await fetch(`https://name-resolution-sri.renci.org/lookup?string=${encodeURIComponent(query)}&limit=10`);
+//       const data = await response.json();
+//       return data || [];
+//     } catch (error) {
+//       console.error('Search error:', error);
+//       return [];
+//     }
+//   };
+
+//   // Debounced search for source
+//   const handleSourceSearch = debounce(async (value: string) => {
+//     if (value.length < 2) {
+//       setSourceSuggestions([]);
+//       setShowSourceDropdown(false);
+//       return;
+//     }
+    
+//     setIsNormalizingSource(true);
+//     const suggestions = await searchNodes(value);
+//     setSourceSuggestions(suggestions);
+//     setShowSourceDropdown(suggestions.length > 0);
+//     setIsNormalizingSource(false);
+//   }, 500);
+
+//   // Debounced search for target
+//   const handleTargetSearch = debounce(async (value: string) => {
+//     if (value.length < 2) {
+//       setTargetSuggestions([]);
+//       setShowTargetDropdown(false);
+//       return;
+//     }
+    
+//     setIsNormalizingTarget(true);
+//     const suggestions = await searchNodes(value);
+//     setTargetSuggestions(suggestions);
+//     setShowTargetDropdown(suggestions.length > 0);
+//     setIsNormalizingTarget(false);
+//   }, 500);
+
+//   // Handle selecting a source suggestion
+//   const selectSourceSuggestion = (suggestion: any) => {
+//     setSourceId(suggestion.curie);
+//     setSourceNormalizedName(suggestion.label);
+    
+//     // Auto-select category
+//     const types = suggestion.types || [];
+//     for (const type of types) {
+//       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
+//       if (NODE_CATEGORIES.includes(biolinkType)) {
+//         setSourceCategory(biolinkType);
+//         break;
+//       }
+//     }
+    
+//     setShowSourceDropdown(false);
+//     setSourceSuggestions([]);
+//   };
+
+//   // Handle selecting a target suggestion
+//   const selectTargetSuggestion = (suggestion: any) => {
+//     setTargetId(suggestion.curie);
+//     setTargetNormalizedName(suggestion.label);
+    
+//     // Auto-select category
+//     const types = suggestion.types || [];
+//     for (const type of types) {
+//       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
+//       if (NODE_CATEGORIES.includes(biolinkType)) {
+//         setTargetCategory(biolinkType);
+//         break;
+//       }
+//     }
+    
+//     setShowTargetDropdown(false);
+//     setTargetSuggestions([]);
+//   };
+
+//   const buildTrapiQuery = () => {
+//     const qualifierConstraints = [];
+  
+//     if (aspectQualifier || directionQualifier) {
+//       const qualifierSet: any[] = [];
+//       if (aspectQualifier) {
+//         qualifierSet.push({
+//           qualifier_type_id: 'biolink:object_aspect_qualifier',
+//           qualifier_value: aspectQualifier,
+//         });
+//       }
+//       if (directionQualifier) {
+//         qualifierSet.push({
+//           qualifier_type_id: 'biolink:object_direction_qualifier',
+//           qualifier_value: directionQualifier,
+//         });
+//       }
+//       qualifierConstraints.push({ qualifier_set: qualifierSet });
+//     }
+  
+//     return {
+//       message: {
+//         query_graph: {
+//           nodes: {
+//             n0: sourceId
+//               ? { ids: [sourceId], categories: [sourceCategory] }
+//               : { categories: [sourceCategory] },
+//             n1: targetId
+//               ? { ids: [targetId], categories: [targetCategory] }
+//               : { categories: [targetCategory] },
+//           },
+//           edges: {
+//             e0: {
+//               subject: "n0",
+//               object: "n1",
+//               predicates: [predicate],
+//               knowledge_type: "inferred",
+//               attribute_constraints: [],
+//               qualifier_constraints: qualifierConstraints,
+//             },
+//           },
+//         },
+//       },
+//     };
+//   };
+  
+//   useEffect(() => {
+//     onQueryPreview?.(buildTrapiQuery());
+//   }, [
+//     sourceId,
+//     targetId,
+//     sourceCategory,
+//     targetCategory,
+//     predicate,
+//     aspectQualifier,
+//     directionQualifier,
+//     predicatesToExclude,
+//     pvalueThreshold,
+//     resultLength,
+//   ]);
+  
+//   const handleExampleQuery = (exampleValue: string, exampleId: string, exampleIsTarget: boolean, idx: number) => {
+//     const [source, pred, target] = exampleValue.split('-');
+//     setSourceCategory(source);
+//     setPredicate(pred);
+//     setTargetCategory(target);
+//     setSelectedExample(idx);
+    
+//     if (exampleIsTarget) {
+//       setSourceId('');
+//       setTargetId(exampleId);
+//       setSourceNormalizedName('');
+//       setTargetNormalizedName('');
+//     } else {
+//       setSourceId(exampleId);
+//       setTargetId('');
+//       setSourceNormalizedName('');
+//       setTargetNormalizedName('');
+//     }
+//   };
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     setError('');
+
+//     if ((!sourceId && !targetId) || (sourceId && targetId)) {
+//       setError('Please provide exactly ONE CURIE (either source OR target)');
+//       return;
+//     }
+
+//     if (!predicate) {
+//       setError('Please select a predicate');
+//       return;
+//     }
+
+//     const curie = sourceId || targetId;
+//     if (!curie.includes(':')) {
+//       setError('CURIE must be in format PREFIX:ID (e.g., MONDO:0004975)');
+//       return;
+//     }
+
+//     setLoading(true);
+
+//     try {
+//       const qualifierConstraints = [];
+//       if (aspectQualifier || directionQualifier) {
+//         const qualifierSet = [];
+//         if (aspectQualifier) {
+//           qualifierSet.push({
+//             qualifier_type_id: 'biolink:object_aspect_qualifier',
+//             qualifier_value: aspectQualifier
+//           });
+//         }
+//         if (directionQualifier) {
+//           qualifierSet.push({
+//             qualifier_type_id: 'biolink:object_direction_qualifier',
+//             qualifier_value: directionQualifier
+//           });
+//         }
+//         qualifierConstraints.push({ qualifier_set: qualifierSet });
+//       }
+
+//       const query: any = {
+//         message: {
+//           query_graph: {
+//             nodes: {
+//               n0: sourceId ? {
+//                 ids: [sourceId],
+//                 categories: [sourceCategory]
+//               } : {
+//                 categories: [sourceCategory]
+//               },
+//               n1: targetId ? {
+//                 ids: [targetId],
+//                 categories: [targetCategory]
+//               } : {
+//                 categories: [targetCategory]
+//               }
+//             },
+//             edges: {
+//               e0: {
+//                 subject: "n0",
+//                 object: "n1",
+//                 predicates: [predicate],
+//                 knowledge_type: "inferred",
+//                 attribute_constraints: [],
+//                 qualifier_constraints: qualifierConstraints
+//               }
+//             }
+//           }
+//         }
+//       };
+      
+//       if (onQueryPreview) {onQueryPreview(query);}
+
+//       // Add parameters if configured
+//       if (showParameters) {
+//         const excludeList = predicatesToExclude
+//           .split(',')
+//           .map(p => p.trim())
+//           .filter(p => p)
+//           .map(p => p.startsWith('biolink:') ? p : `biolink:${p}`);
+
+//         query.parameters = {
+//           pvalue_threshold: parseFloat(pvalueThreshold),
+//           result_length: parseInt(resultLength, 10),
+//           predicates_to_exclude: excludeList
+//         };
+//       }
+
+//       const response = await enrichmentAPI.submitAnalysis(query);
+//       onJobCreated(response.job_id);
+//     } catch (err: any) {
+//       console.error('Error submitting job:', err);
+//       setError(err.response?.data?.detail || err.message || 'Failed to submit query');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const formatCategoryName = (cat: string) => {
+//     return cat.replace('biolink:', '').replace(/([A-Z])/g, ' $1').trim();
+//   };
+
+//   return (
+//     <div className="space-y-6">
+//       {/* Example Queries */}
+//       <div>
+//         <div className="flex items-center gap-2 mb-3">
+//           <Lightbulb className="w-4 h-4 text-amber-500" />
+//           <label className="text-sm font-semibold text-slate-700">
+//             Quick Start Templates
+//           </label>
+//         </div>
+//         <div className="grid grid-cols-1 gap-2">
+//           {EXAMPLE_QUERIES.map((query, idx) => (
+//             <button
+//               key={idx}
+//               type="button"
+//               onClick={() => handleExampleQuery(query.value, query.example, query.exampleIsTarget, idx)}
+//               className={`
+//                 text-left px-4 py-3 rounded-xl border-2 transition-all duration-200
+//                 ${selectedExample === idx 
+//                   ? 'border-purple-500 bg-purple-50 shadow-sm' 
+//                   : 'border-slate-200 hover:border-purple-200 hover:bg-purple-50/50'
+//                 }
+//               `}
+//             >
+//               <div className="flex items-center justify-between">
+//                 <span className={`font-medium ${selectedExample === idx ? 'text-purple-700' : 'text-slate-700'}`}>
+//                   {query.label}
+//                 </span>
+//                 <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+//                   {query.example}
+//                 </span>
+//               </div>
+//               <p className="text-xs text-slate-500 mt-1">{query.description}</p>
+//             </button>
+//           ))}
+//         </div>
+//       </div>
+
+//       <div className="h-px bg-purple-100" />
+
+//       <form onSubmit={handleSubmit} className="space-y-6">
+//         {/* Node Configuration */}
+//         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//           {/* Source Node */}
+//           <div className="space-y-3">
+//             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+//               <div className="w-2 h-2 rounded-full bg-violet-500" />
+//               Source Node
+//             </label>
+            
+//             <div className="relative">
+//               <input
+//                 type="text"
+//                 value={sourceId}
+//                 onChange={(e) => {
+//                   setSourceId(e.target.value);
+//                   setSourceNormalizedName('');
+//                   handleSourceSearch(e.target.value);
+//                 }}
+//                 onFocus={() => sourceId.length >= 2 && sourceSuggestions.length > 0 && setShowSourceDropdown(true)}
+//                 onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
+//                 placeholder="Type name or CURIE (e.g., Alzheimer or MONDO:0004975)"
+//                 className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
+//               />
+//               {isNormalizingSource && (
+//                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
+//               )}
+              
+//               {/* Autocomplete Dropdown */}
+//               {showSourceDropdown && sourceSuggestions.length > 0 && (
+//                 <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+//                   {sourceSuggestions.map((suggestion, idx) => (
+//                     <button
+//                       key={idx}
+//                       type="button"
+//                       onMouseDown={() => selectSourceSuggestion(suggestion)}
+//                       className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-purple-50 last:border-0"
+//                     >
+//                       <div className="font-medium text-slate-900 text-sm">{suggestion.label}</div>
+//                       <div className="text-xs text-slate-500 font-mono mt-1">{suggestion.curie}</div>
+//                       {suggestion.types && suggestion.types.length > 0 && (
+//                         <div className="text-xs text-purple-600 mt-1">
+//                           {suggestion.types[0].replace('biolink:', '')}
+//                         </div>
+//                       )}
+//                     </button>
+//                   ))}
+//                 </div>
+//               )}
+//             </div>
+            
+//             {sourceNormalizedName && (
+//               <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+//                 <Search className="w-4 h-4 text-green-600" />
+//                 <span className="text-sm text-green-700 font-medium">{sourceNormalizedName}</span>
+//               </div>
+//             )}
+            
+//             <select
+//               value={sourceCategory}
+//               onChange={(e) => setSourceCategory(e.target.value)}
+//               className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
+//             >
+//               {NODE_CATEGORIES.map((cat, idx) => (
+//                 <option key={`source-${cat}-${idx}`} value={cat}>
+//                   {formatCategoryName(cat)}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+
+//           {/* Target Node */}
+//           <div className="space-y-3">
+//             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+//               <div className="w-2 h-2 rounded-full bg-fuchsia-500" />
+//               Target Node
+//             </label>
+            
+//             <div className="relative">
+//               <input
+//                 type="text"
+//                 value={targetId}
+//                 onChange={(e) => {
+//                   setTargetId(e.target.value);
+//                   setTargetNormalizedName('');
+//                   handleTargetSearch(e.target.value);
+//                 }}
+//                 onFocus={() => targetId.length >= 2 && targetSuggestions.length > 0 && setShowTargetDropdown(true)}
+//                 onBlur={() => setTimeout(() => setShowTargetDropdown(false), 200)}
+//                 placeholder="Type name or CURIE (e.g., dopamine or CHEBI:18243)"
+//                 className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
+//               />
+//               {isNormalizingTarget && (
+//                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
+//               )}
+              
+//               {/* Autocomplete Dropdown */}
+//               {showTargetDropdown && targetSuggestions.length > 0 && (
+//                 <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+//                   {targetSuggestions.map((suggestion, idx) => (
+//                     <button
+//                       key={idx}
+//                       type="button"
+//                       onMouseDown={() => selectTargetSuggestion(suggestion)}
+//                       className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-purple-50 last:border-0"
+//                     >
+//                       <div className="font-medium text-slate-900 text-sm">{suggestion.label}</div>
+//                       <div className="text-xs text-slate-500 font-mono mt-1">{suggestion.curie}</div>
+//                       {suggestion.types && suggestion.types.length > 0 && (
+//                         <div className="text-xs text-purple-600 mt-1">
+//                           {suggestion.types[0].replace('biolink:', '')}
+//                         </div>
+//                       )}
+//                     </button>
+//                   ))}
+//                 </div>
+//               )}
+//             </div>
+            
+//             {targetNormalizedName && (
+//               <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+//                 <Search className="w-4 h-4 text-green-600" />
+//                 <span className="text-sm text-green-700 font-medium">{targetNormalizedName}</span>
+//               </div>
+//             )}
+            
+//             <select
+//               value={targetCategory}
+//               onChange={(e) => setTargetCategory(e.target.value)}
+//               className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
+//             >
+//               {NODE_CATEGORIES.map((cat, idx) => (
+//                 <option key={`target-${cat}-${idx}`} value={cat}>
+//                   {formatCategoryName(cat)}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+//         </div>
+
+//         {/* Predicate */}
+//         <div className="space-y-3">
+//           <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+//             <div className="w-6 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded" />
+//             Relationship Predicate
+//           </label>
+//           <select
+//             value={predicate}
+//             onChange={(e) => setPredicate(e.target.value)}
+//             className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
+//           >
+//             {PREDICATES.map((pred, idx) => (
+//               <option key={`pred-${pred}-${idx}`} value={pred}>
+//                 {pred.replace('biolink:', '').replace(/_/g, ' ')}
+//               </option>
+//             ))}
+//           </select>
+//         </div>
+
+//         {/* Qualifiers */}
+//         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-slate-600">
+//               Aspect Qualifier <span className="text-slate-400">(optional)</span>
+//             </label>
+//             <select
+//               value={aspectQualifier}
+//               onChange={(e) => setAspectQualifier(e.target.value)}
+//               className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
+//             >
+//               <option value="">None</option>
+//               {ASPECT_QUALIFIERS.map((qual, idx) => (
+//                 <option key={`aspect-${qual}-${idx}`} value={qual}>
+//                   {qual}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-slate-600">
+//               Direction Qualifier <span className="text-slate-400">(optional)</span>
+//             </label>
+//             <select
+//               value={directionQualifier}
+//               onChange={(e) => setDirectionQualifier(e.target.value)}
+//               className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
+//             >
+//               <option value="">None</option>
+//               {DIRECTION_QUALIFIERS.map((qual, idx) => (
+//                 <option key={`direction-${qual}-${idx}`} value={qual}>
+//                   {qual}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+//         </div>
+
+//         {/* Advanced Parameters Toggle */}
+//         <div className="border-t border-purple-100 pt-4">
+//           <button
+//             type="button"
+//             onClick={() => setShowParameters(!showParameters)}
+//             className="flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium text-sm transition-colors"
+//           >
+//             <Settings2 className="w-4 h-4" />
+//             Advanced Parameters
+//             {showParameters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+//           </button>
+
+//           {showParameters && (
+//             <div className="mt-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 space-y-4">
+//               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//                 <div className="space-y-2">
+//                   <label className="text-sm font-medium text-slate-700">
+//                     P-value Threshold
+//                   </label>
+//                   <input
+//                     type="text"
+//                     value={pvalueThreshold}
+//                     onChange={(e) => setPvalueThreshold(e.target.value)}
+//                     className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
+//                   />
+//                 </div>
+
+//                 <div className="space-y-2">
+//                   <label className="text-sm font-medium text-slate-700">
+//                     Max Results
+//                   </label>
+//                   <input
+//                     type="number"
+//                     value={resultLength}
+//                     onChange={(e) => setResultLength(e.target.value)}
+//                     className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
+//                     min="1"
+//                     max="10000"
+//                   />
+//                 </div>
+//               </div>
+
+//               <div className="space-y-2">
+//                 <label className="text-sm font-medium text-slate-700">
+//                   Predicates to Exclude
+//                 </label>
+//                 <textarea
+//                   value={predicatesToExclude}
+//                   onChange={(e) => setPredicatesToExclude(e.target.value)}
+//                   rows={3}
+//                   className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+//                   placeholder="Comma-separated list of predicates..."
+//                 />
+//               </div>
+//             </div>
+//           )}
+//         </div>
+
+//         {/* Error Display */}
+//         {error && (
+//           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl">
+//             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+//             <span className="text-sm text-red-700">{error}</span>
+//           </div>
+//         )}
+
+//         {/* Submit Button */}
+//         <button
+//           type="submit"
+//           disabled={loading}
+//           className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+//         >
+//           {loading ? (
+//             <>
+//               <Loader2 className="w-5 h-5 animate-spin" />
+//               Processing Query...
+//             </>
+//           ) : (
+//             <>
+//               <Play className="w-5 h-5" />
+//               Run Enrichment Analysis
+//             </>
+//           )}
+//         </button>
+//       </form>
+
+//       {/* Help Text */}
+//       <div className="flex items-start gap-2 px-4 py-3 bg-purple-50 rounded-xl border border-purple-100">
+//         <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+//         <p className="text-sm text-purple-700">
+//           Type a <strong>name or CURIE</strong> in either source or target field. Suggestions will appear as you type!
+//         </p>
+//       </div>
+//     </div>
+//   );
+// };
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, 
   Info, 
@@ -9,8 +701,19 @@ import {
   Lightbulb,
   Loader2,
   AlertCircle,
+  X,
+  Plus,
 } from 'lucide-react';
 import { enrichmentAPI, PREDICATES, NODE_CATEGORIES, ASPECT_QUALIFIERS, DIRECTION_QUALIFIERS } from '../utils/api';
+
+// Qualified predicates that support aspect/direction qualifiers
+const QUALIFIED_PREDICATES = ['biolink:affects', 'biolink:regulates'];
+
+// Direction qualifiers specific to each qualified predicate
+const DIRECTION_QUALIFIERS_BY_PREDICATE: Record<string, string[]> = {
+  'biolink:affects': ['increased', 'decreased'],
+  'biolink:regulates': ['upregulated', 'downregulated'],
+};
 
 const EXAMPLE_QUERIES = [
   {
@@ -64,6 +767,20 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (..
   };
 }
 
+// Chip component for displaying selected items
+const Chip: React.FC<{ label: string; onRemove: () => void; color?: string }> = ({ label, onRemove, color = 'purple' }) => (
+  <span className={`inline-flex items-center gap-1 px-2 py-1 bg-${color}-100 text-${color}-700 rounded-lg text-xs font-medium`}>
+    {label.replace('biolink:', '')}
+    <button
+      type="button"
+      onClick={onRemove}
+      className={`hover:bg-${color}-200 rounded-full p-0.5 transition-colors`}
+    >
+      <X className="w-3 h-3" />
+    </button>
+  </span>
+);
+
 export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQueryPreview }) => {
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
@@ -75,10 +792,32 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [showParameters, setShowParameters] = useState(false);
   const [pvalueThreshold, setPvalueThreshold] = useState('1e-5');
   const [resultLength, setResultLength] = useState('100');
-  const [predicatesToExclude, setPredicatesToExclude] = useState('causes, biomarker_for, contraindicated_for, contraindicated_in, contributes_to, has_adverse_event, causes_adverse_event, treats_or_applied_or_studied_to_treat');
+  const [ruleLength, setRuleLength] = useState('100');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedExample, setSelectedExample] = useState<number | null>(null);
+
+  // Node types to prioritize
+  const [nodesToPrioritize, setNodesToPrioritize] = useState<string[]>([]);
+  const [nodeTypeInput, setNodeTypeInput] = useState('');
+  const [nodeTypeSuggestions, setNodeTypeSuggestions] = useState<string[]>([]);
+  const [showNodeTypeSuggestions, setShowNodeTypeSuggestions] = useState(false);
+  const nodeTypeInputRef = useRef<HTMLInputElement>(null);
+
+  // Predicate constraints
+  const [predicateConstraintStyle, setPredicateConstraintStyle] = useState<'exclude' | 'include'>('exclude');
+  const [predicatesToConstrain, setPredicatesToConstrain] = useState<string[]>([
+    'biolink:causes',
+    'biolink:biomarker_for',
+    'biolink:contraindicated_for',
+    'biolink:contributes_to',
+    'biolink:has_adverse_event',
+    'biolink:causes_adverse_event',
+  ]);
+  const [predicateInput, setPredicateInput] = useState('');
+  const [predicateSuggestions, setPredicateSuggestions] = useState<string[]>([]);
+  const [showPredicateSuggestions, setShowPredicateSuggestions] = useState(false);
+  const predicateInputRef = useRef<HTMLInputElement>(null);
 
   // Name resolution states
   const [isNormalizingSource, setIsNormalizingSource] = useState(false);
@@ -89,6 +828,62 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [targetSuggestions, setTargetSuggestions] = useState<any[]>([]);
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showTargetDropdown, setShowTargetDropdown] = useState(false);
+
+  // Handle node type input with suggestions
+  const handleNodeTypeInputChange = (value: string) => {
+    setNodeTypeInput(value);
+    if (value.length > 0) {
+      const filtered = NODE_CATEGORIES.filter(
+        type => type.toLowerCase().includes(value.toLowerCase()) && !nodesToPrioritize.includes(type)
+      );
+      setNodeTypeSuggestions(filtered);
+      setShowNodeTypeSuggestions(filtered.length > 0);
+    } else {
+      setNodeTypeSuggestions([]);
+      setShowNodeTypeSuggestions(false);
+    }
+  };
+
+  const addNodeType = (nodeType: string) => {
+    const formatted = nodeType.startsWith('biolink:') ? nodeType : `biolink:${nodeType}`;
+    if (!nodesToPrioritize.includes(formatted)) {
+      setNodesToPrioritize([...nodesToPrioritize, formatted]);
+    }
+    setNodeTypeInput('');
+    setShowNodeTypeSuggestions(false);
+  };
+
+  const removeNodeType = (nodeType: string) => {
+    setNodesToPrioritize(nodesToPrioritize.filter(n => n !== nodeType));
+  };
+
+  // Handle predicate input with suggestions
+  const handlePredicateInputChange = (value: string) => {
+    setPredicateInput(value);
+    if (value.length > 0) {
+      const filtered = PREDICATES.filter(
+        pred => pred.toLowerCase().includes(value.toLowerCase()) && !predicatesToConstrain.includes(pred)
+      );
+      setPredicateSuggestions(filtered);
+      setShowPredicateSuggestions(filtered.length > 0);
+    } else {
+      setPredicateSuggestions([]);
+      setShowPredicateSuggestions(false);
+    }
+  };
+
+  const addPredicate = (pred: string) => {
+    const formatted = pred.startsWith('biolink:') ? pred : `biolink:${pred}`;
+    if (!predicatesToConstrain.includes(formatted)) {
+      setPredicatesToConstrain([...predicatesToConstrain, formatted]);
+    }
+    setPredicateInput('');
+    setShowPredicateSuggestions(false);
+  };
+
+  const removePredicate = (pred: string) => {
+    setPredicatesToConstrain(predicatesToConstrain.filter(p => p !== pred));
+  };
 
   // Autocomplete search function
   const searchNodes = async (query: string): Promise<any[]> => {
@@ -139,7 +934,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     setSourceId(suggestion.curie);
     setSourceNormalizedName(suggestion.label);
     
-    // Auto-select category
     const types = suggestion.types || [];
     for (const type of types) {
       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
@@ -158,7 +952,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     setTargetId(suggestion.curie);
     setTargetNormalizedName(suggestion.label);
     
-    // Auto-select category
     const types = suggestion.types || [];
     for (const type of types) {
       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
@@ -192,7 +985,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
       qualifierConstraints.push({ qualifier_set: qualifierSet });
     }
   
-    return {
+    const query: any = {
       message: {
         query_graph: {
           nodes: {
@@ -216,6 +1009,40 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
         },
       },
     };
+
+    // Add parameters if advanced settings are shown
+    if (showParameters) {
+      query.parameters = {};
+
+      // Only include parameters that have valid values
+      const parsedPvalue = parseFloat(pvalueThreshold);
+      if (!isNaN(parsedPvalue)) {
+        query.parameters.pvalue_threshold = parsedPvalue;
+      }
+
+      const parsedResultLength = parseInt(resultLength, 10);
+      if (!isNaN(parsedResultLength) && parsedResultLength > 0) {
+        query.parameters.result_length = parsedResultLength;
+      }
+
+      const parsedRuleLength = parseInt(ruleLength, 10);
+      if (!isNaN(parsedRuleLength) && parsedRuleLength > 0) {
+        query.parameters.rule_length = parsedRuleLength;
+      }
+
+      // Add node constraints if specified
+      if (nodesToPrioritize.length > 0) {
+        query.parameters.nodes_to_prioritize = nodesToPrioritize;
+      }
+
+      // Add predicate constraints
+      if (predicatesToConstrain.length > 0) {
+        query.parameters.predicate_constraint_style = predicateConstraintStyle;
+        query.parameters.predicate_constraints = predicatesToConstrain;
+      }
+    }
+
+    return query;
   };
   
   useEffect(() => {
@@ -228,9 +1055,13 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     predicate,
     aspectQualifier,
     directionQualifier,
-    predicatesToExclude,
+    showParameters,
     pvalueThreshold,
     resultLength,
+    ruleLength,
+    nodesToPrioritize,
+    predicateConstraintStyle,
+    predicatesToConstrain,
   ]);
   
   const handleExampleQuery = (exampleValue: string, exampleId: string, exampleIsTarget: boolean, idx: number) => {
@@ -276,70 +1107,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     setLoading(true);
 
     try {
-      const qualifierConstraints = [];
-      if (aspectQualifier || directionQualifier) {
-        const qualifierSet = [];
-        if (aspectQualifier) {
-          qualifierSet.push({
-            qualifier_type_id: 'biolink:object_aspect_qualifier',
-            qualifier_value: aspectQualifier
-          });
-        }
-        if (directionQualifier) {
-          qualifierSet.push({
-            qualifier_type_id: 'biolink:object_direction_qualifier',
-            qualifier_value: directionQualifier
-          });
-        }
-        qualifierConstraints.push({ qualifier_set: qualifierSet });
-      }
-
-      const query: any = {
-        message: {
-          query_graph: {
-            nodes: {
-              n0: sourceId ? {
-                ids: [sourceId],
-                categories: [sourceCategory]
-              } : {
-                categories: [sourceCategory]
-              },
-              n1: targetId ? {
-                ids: [targetId],
-                categories: [targetCategory]
-              } : {
-                categories: [targetCategory]
-              }
-            },
-            edges: {
-              e0: {
-                subject: "n0",
-                object: "n1",
-                predicates: [predicate],
-                knowledge_type: "inferred",
-                attribute_constraints: [],
-                qualifier_constraints: qualifierConstraints
-              }
-            }
-          }
-        }
-      };
+      const query = buildTrapiQuery();
       
-      if (onQueryPreview) {onQueryPreview(query);}
-
-      // Add parameters if configured
-      if (showParameters) {
-        const excludeList = predicatesToExclude
-          .split(',')
-          .map(p => p.trim())
-          .filter(p => p)
-          .map(p => p.startsWith('biolink:') ? p : `biolink:${p}`);
-
-        query.parameters = {
-          pvalue_threshold: parseFloat(pvalueThreshold),
-          result_length: parseInt(resultLength, 10),
-          predicates_to_exclude: excludeList
-        };
+      if (onQueryPreview) {
+        onQueryPreview(query);
       }
 
       const response = await enrichmentAPI.submitAnalysis(query);
@@ -357,10 +1128,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Example Queries */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <Lightbulb className="w-4 h-4 text-amber-500" />
           <label className="text-sm font-semibold text-slate-700">
             Quick Start Templates
@@ -544,7 +1315,20 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           </label>
           <select
             value={predicate}
-            onChange={(e) => setPredicate(e.target.value)}
+            onChange={(e) => {
+              const newPredicate = e.target.value;
+              setPredicate(newPredicate);
+              // Clear qualifiers if switching to a non-qualified predicate
+              // or clear direction qualifier when switching between qualified predicates
+              // (since they have different valid direction options)
+              if (!QUALIFIED_PREDICATES.includes(newPredicate)) {
+                setAspectQualifier('');
+                setDirectionQualifier('');
+              } else if (newPredicate !== predicate) {
+                // Switching between affects and regulates - clear direction qualifier
+                setDirectionQualifier('');
+              }
+            }}
             className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
           >
             {PREDICATES.map((pred, idx) => (
@@ -555,44 +1339,59 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           </select>
         </div>
 
-        {/* Qualifiers */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-600">
-              Aspect Qualifier <span className="text-slate-400">(optional)</span>
-            </label>
-            <select
-              value={aspectQualifier}
-              onChange={(e) => setAspectQualifier(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
-            >
-              <option value="">None</option>
-              {ASPECT_QUALIFIERS.map((qual, idx) => (
-                <option key={`aspect-${qual}-${idx}`} value={qual}>
-                  {qual}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Qualifiers - Only show for qualified predicates (affects, regulates) */}
+        {QUALIFIED_PREDICATES.includes(predicate) && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-4">
+            <div className="flex items-center gap-2 text-amber-800">
+              <Info className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Qualifiers available for "{predicate.replace('biolink:', '').replace(/_/g, ' ')}"
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600">
+                  Aspect Qualifier <span className="text-slate-400">(optional)</span>
+                </label>
+                <select
+                  value={aspectQualifier}
+                  onChange={(e) => setAspectQualifier(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-600 text-sm"
+                >
+                  <option value="">None</option>
+                  {ASPECT_QUALIFIERS.map((qual, idx) => (
+                    <option key={`aspect-${qual}-${idx}`} value={qual}>
+                      {qual}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-600">
-              Direction Qualifier <span className="text-slate-400">(optional)</span>
-            </label>
-            <select
-              value={directionQualifier}
-              onChange={(e) => setDirectionQualifier(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-600 text-sm"
-            >
-              <option value="">None</option>
-              {DIRECTION_QUALIFIERS.map((qual, idx) => (
-                <option key={`direction-${qual}-${idx}`} value={qual}>
-                  {qual}
-                </option>
-              ))}
-            </select>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600">
+                  Direction Qualifier <span className="text-slate-400">(optional)</span>
+                </label>
+                <select
+                  value={directionQualifier}
+                  onChange={(e) => setDirectionQualifier(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-600 text-sm"
+                >
+                  <option value="">None</option>
+                  {(DIRECTION_QUALIFIERS_BY_PREDICATE[predicate] || []).map((qual, idx) => (
+                    <option key={`direction-${qual}-${idx}`} value={qual}>
+                      {qual}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-amber-700">
+                  {predicate === 'biolink:affects' 
+                    ? 'Use "increased" or "decreased" for affects' 
+                    : 'Use "upregulated" or "downregulated" for regulates'}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Advanced Parameters Toggle */}
         <div className="border-t border-purple-100 pt-4">
@@ -607,8 +1406,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           </button>
 
           {showParameters && (
-            <div className="mt-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 space-y-5">
+              {/* Basic Parameters Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
                     P-value Threshold
@@ -617,8 +1417,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                     type="text"
                     value={pvalueThreshold}
                     onChange={(e) => setPvalueThreshold(e.target.value)}
+                    placeholder="e.g., 1e-5"
                     className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
                   />
+                  <p className="text-xs text-slate-500">Leave empty for backend default</p>
                 </div>
 
                 <div className="space-y-2">
@@ -629,25 +1431,225 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                     type="number"
                     value={resultLength}
                     onChange={(e) => setResultLength(e.target.value)}
+                    placeholder="e.g., 100"
                     className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
                     min="1"
                     max="10000"
                   />
+                  <p className="text-xs text-slate-500">Leave empty for all results</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Rule Length
+                  </label>
+                  <input
+                    type="number"
+                    value={ruleLength}
+                    onChange={(e) => setRuleLength(e.target.value)}
+                    placeholder="e.g., 100"
+                    className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-mono text-sm"
+                    min="1"
+                    max="1000"
+                  />
+                  <p className="text-xs text-slate-500">Leave empty for all rules</p>
                 </div>
               </div>
 
+              {/* Predicate Constraints */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-700">
+                    Predicate Constraints
+                    <span className="text-slate-400 font-normal ml-1">(optional)</span>
+                  </label>
+                  
+                  {/* Constraint Style Toggle */}
+                  <div className="flex items-center gap-2 bg-white border border-purple-200 rounded-lg p-1">
+                    <button
+                      type="button"
+                      onClick={() => setPredicateConstraintStyle('exclude')}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                        predicateConstraintStyle === 'exclude'
+                          ? 'bg-red-500 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      Exclude
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPredicateConstraintStyle('include')}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                        predicateConstraintStyle === 'include'
+                          ? 'bg-green-500 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      Include Only
+                    </button>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-slate-500">
+                  {predicateConstraintStyle === 'exclude' 
+                    ? 'These predicates will be excluded from enrichment analysis'
+                    : 'Only these predicates will be prioritized in enrichment analysis'
+                  }
+                </p>
+                
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={predicateInputRef}
+                      type="text"
+                      value={predicateInput}
+                      onChange={(e) => handlePredicateInputChange(e.target.value)}
+                      onFocus={() => predicateInput.length > 0 && setShowPredicateSuggestions(predicateSuggestions.length > 0)}
+                      onBlur={() => setTimeout(() => setShowPredicateSuggestions(false), 200)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && predicateInput) {
+                          e.preventDefault();
+                          addPredicate(predicateInput);
+                        }
+                      }}
+                      placeholder="Type to search predicates (e.g., treats, causes)..."
+                      className="flex-1 px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => predicateInput && addPredicate(predicateInput)}
+                      className="px-3 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {/* Predicate Suggestions Dropdown */}
+                  {showPredicateSuggestions && predicateSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {predicateSuggestions.map((pred, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onMouseDown={() => addPredicate(pred)}
+                          className="w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors text-sm border-b border-purple-50 last:border-0"
+                        >
+                          <span className="text-purple-700">{pred.replace('biolink:', '').replace(/_/g, ' ')}</span>
+                          <span className="text-slate-400 text-xs ml-2">{pred}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Predicates */}
+                {predicatesToConstrain.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {predicatesToConstrain.map((pred, idx) => (
+                      <span
+                        key={idx}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                          predicateConstraintStyle === 'exclude'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {pred.replace('biolink:', '').replace(/_/g, ' ')}
+                        <button
+                          type="button"
+                          onClick={() => removePredicate(pred)}
+                          className={`rounded-full p-0.5 transition-colors ${
+                            predicateConstraintStyle === 'exclude'
+                              ? 'hover:bg-red-200'
+                              : 'hover:bg-green-200'
+                          }`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Node Types to Prioritize */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">
-                  Predicates to Exclude
+                  Node Constraints
+                  <span className="text-slate-400 font-normal ml-1">(optional)</span>
                 </label>
-                <textarea
-                  value={predicatesToExclude}
-                  onChange={(e) => setPredicatesToExclude(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
-                  placeholder="Comma-separated list of predicates..."
-                />
+                <p className="text-xs text-slate-500 mb-2">
+                  These node types will be prioritize in the enrichment analysis
+                </p>
+                
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={nodeTypeInputRef}
+                      type="text"
+                      value={nodeTypeInput}
+                      onChange={(e) => handleNodeTypeInputChange(e.target.value)}
+                      onFocus={() => nodeTypeInput.length > 0 && setShowNodeTypeSuggestions(nodeTypeSuggestions.length > 0)}
+                      onBlur={() => setTimeout(() => setShowNodeTypeSuggestions(false), 200)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nodeTypeInput) {
+                          e.preventDefault();
+                          addNodeType(nodeTypeInput);
+                        }
+                      }}
+                      placeholder="Type to search node types (e.g., Gene, Disease)..."
+                      className="flex-1 px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => nodeTypeInput && addNodeType(nodeTypeInput)}
+                      className="px-3 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {/* Node Type Suggestions Dropdown */}
+                  {showNodeTypeSuggestions && nodeTypeSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {nodeTypeSuggestions.map((type, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onMouseDown={() => addNodeType(type)}
+                          className="w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors text-sm border-b border-purple-50 last:border-0"
+                        >
+                          <span className="text-purple-700">{type.replace('biolink:', '')}</span>
+                          <span className="text-slate-400 text-xs ml-2">{type}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Node Types */}
+                {nodesToPrioritize.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {nodesToPrioritize.map((nodeType, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium"
+                      >
+                        {nodeType.replace('biolink:', '')}
+                        <button
+                          type="button"
+                          onClick={() => removeNodeType(nodeType)}
+                          className="hover:bg-indigo-200 rounded-full p-0.5 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
+
             </div>
           )}
         </div>
@@ -674,7 +1676,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           ) : (
             <>
               <Play className="w-5 h-5" />
-              Run Enrichment Analysis
+              Run Inference Analysis
             </>
           )}
         </button>
@@ -684,7 +1686,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
       <div className="flex items-start gap-2 px-4 py-3 bg-purple-50 rounded-xl border border-purple-100">
         <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-purple-700">
-          Type a <strong>name or CURIE</strong> in either source or target field. Suggestions will appear as you type!
+          Type a <strong>name or CURIE</strong> in either source or target field. Use <strong>Advanced Parameters</strong> to fine-tune the inference.
         </p>
       </div>
     </div>

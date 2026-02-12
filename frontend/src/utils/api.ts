@@ -203,16 +203,22 @@ export const COMMON_CHEMICALS = [
 ];
 
 export const ASPECT_QUALIFIERS = [
+  'activity_or_abundance',
   'activity',
   'abundance',
   'expression',
+  'folding',
   'localization',
+  'molecular_interaction',
   'molecular_modification',
+  'metabolic_processing',
   'synthesis',
   'degradation',
   'secretion',
   'transport',
-  'stability'
+  'mutation_rate',
+  'splicing',
+  'uptake'
 ];
 
 export const DIRECTION_QUALIFIERS = [
