@@ -185,7 +185,7 @@ EDGAR accepts queries in the Translator Reasoner API (TRAPI) format:
   },
   "parameters": {
     "pvalue_threshold": 1e-5,
-    "result_length": 100
+    "max_results": 100
   }
 }
 ```

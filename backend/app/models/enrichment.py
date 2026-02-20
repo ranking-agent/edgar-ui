@@ -62,8 +62,8 @@ class QueryMessage(BaseModel):
 class EnrichmentParameters(BaseModel):
     """EDGAR-specific parameters"""
     pvalue_threshold: float = Field(default=1e-5, ge=0.0, le=1.0)
-    result_length: int = Field(default=100, ge=1, le=10000)
-    predicates_to_exclude: List[str] = Field(
+    max_results: int = Field(default=100, ge=1, le=10000)
+    predicate_constraints: List[str] = Field(
         default_factory=lambda: [
             "biolink:causes",
             "biolink:biomarker_for",
@@ -71,7 +71,8 @@ class EnrichmentParameters(BaseModel):
             "biolink:contraindicated_in",
             "biolink:contributes_to",
             "biolink:has_adverse_event",
-            "biolink:causes_adverse_event"
+            "biolink:causes_adverse_event",
+            "biolink:similar_to"
         ]
     )
 

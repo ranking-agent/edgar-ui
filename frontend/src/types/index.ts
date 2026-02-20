@@ -40,6 +40,13 @@ export interface QualifierConstraint {
   qualifier_set: QualifierSet[];
 }
 
+export interface Log {
+  level: string;
+  message: string;
+  timestamp?: string;
+  code?: string;
+}
+
 export interface NodeConstraints {
   ids?: string[];
   categories: string[];
@@ -68,8 +75,12 @@ export interface QueryMessage {
 
 export interface EnrichmentParameters {
   pvalue_threshold?: number;
-  result_length?: number;
-  predicates_to_exclude?: string[];
+  max_results?: number | null;
+  max_rules?:number | null;
+  predicate_constraints?: string[];
+  predicate_constraint_style?: string;
+  node_constraints?: string[];
+  property_constraints?: string[];
 }
 
 export interface EnrichmentRequest {
@@ -122,12 +133,7 @@ export interface Result {
   analyses: Analysis[];
 }
 
-export interface Log {
-  level: string;
-  message: string;
-  timestamp?: string;
-  code?: string;
-}
+
 
 export interface EnrichmentResults {
   message?: {

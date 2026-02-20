@@ -451,7 +451,10 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
     const edges = auxGraph.edges || [];
     if (edges.length !== 3) return null;
 
-    // Find the three edges and track their directions
+    // Determine if this is property enrichment (n_Inferred) or graph enrichment
+    const isPropertyEnrichment = sgId.startsWith('n_Inferred') || sgId.includes('n_Inferred');
+
+    // Find the three edges and track their actual directions
     let inputToLookupEdge: any = null;
     let lookupToEnrichmentEdge: any = null;
     let resultToEnrichmentEdge: any = null;
@@ -459,10 +462,9 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
     let enrichmentNodeids: any = null;
     let resultNodeIds: any = null;
     
-    // Track if input/lookup/enrichment/result is subject or object in each edge
-    let inputIsSubject = true;        // For inputToLookupEdge
-    let lookupIsSubjectToEnrichment = true;  // For lookupToEnrichmentEdge
-    let resultIsSubject = true;       // For resultToEnrichmentEdge
+    // Direction tracking: true means left node is subject, false means left node is object
+    let inputIsSubject = true;           // Input → Lookup direction
+    let lookupIsSubject = true;          // Lookup → Enrichment direction
 
     edges.forEach((edgeId: string) => {
       const edge = knowledgeGraph?.edges[edgeId];
@@ -475,6 +477,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
       ) {
         inputToLookupEdge = edge;
         inputNodeids = queryInputIds.has(edge.subject) ? edge.subject : edge.object;
+        // Input is subject if query input is in subject position
         inputIsSubject = queryInputIds.has(edge.subject);
       }
       // Lookup Set to Enrichment
@@ -485,19 +488,42 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
       ))) {
         lookupToEnrichmentEdge = edge;
         enrichmentNodeids = edge.object?.startsWith('uuid:') ? edge.subject : edge.object;
-        lookupIsSubjectToEnrichment = edge.subject?.startsWith('uuid:');
+        // Lookup (uuid) is subject if uuid is in subject position
+        lookupIsSubject = edge.subject?.startsWith('uuid:');
       }
       // Result to Enrichment
       else if (!queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') &&
                !queryInputIds.has(edge.object) && !edge.object?.startsWith('uuid:')) {
         resultToEnrichmentEdge = edge;
-        resultNodeIds = !queryInputIds.has(edge.subject) && !edge.subject?.startsWith('uuid:') 
-          ? edge.subject 
-          : edge.object;
-        // Determine if result node is subject
-        resultIsSubject = edge.subject === resultNodeIds;
+        // We need to figure out which node is result vs enrichment
+        // Will be resolved after all edges are processed
+        resultNodeIds = edge.subject; // Temporary, will refine below
       }
     });
+    
+    // Determine enrichment→result direction based on enrichment type:
+    // - Property enrichment (n_Inferred): Inferred result is ALWAYS subject → enrichment is ALWAYS object
+    //   So from enrichment's perspective: Enrichment ← Result (enrichmentIsSubjectToResult = false)
+    // - Graph enrichment: Enrichment maintains its role from lookup→enrichment
+    //   If lookupIsSubject (Lookup→Enrichment), enrichment is object, so Result→Enrichment (enrichmentIsSubjectToResult = false)
+    //   If !lookupIsSubject (Enrichment→Lookup), enrichment is subject, so Enrichment→Result (enrichmentIsSubjectToResult = true)
+    let enrichmentIsSubjectToResult: boolean;
+    
+    if (isPropertyEnrichment) {
+      // Property enrichment: Result is ALWAYS subject, Enrichment is ALWAYS object
+      enrichmentIsSubjectToResult = false;  // Enrichment ← Result
+    } else {
+      // Graph enrichment: Enrichment maintains its role
+      enrichmentIsSubjectToResult = !lookupIsSubject;
+    }
+    
+    if (resultToEnrichmentEdge && enrichmentNodeids) {
+      if (resultToEnrichmentEdge.subject === enrichmentNodeids) {
+        resultNodeIds = resultToEnrichmentEdge.object;
+      } else {
+        resultNodeIds = resultToEnrichmentEdge.subject;
+      }
+    }
 
     const missingEdges = [
       !inputToLookupEdge && "input-to-lookup",
@@ -598,11 +624,10 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
     const pred2 = lookupToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
     const pred3 = resultToEnrichmentEdge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'relates to';
 
-    // Determine arrow directions based on subject/object relationships
-    // Arrow points FROM subject TO object
-    // pred1: inputIsSubject ? input→lookup : input←lookup
-    // pred2: lookupIsSubjectToEnrichment ? lookup→enrichment : lookup←enrichment  
-    // pred3: resultIsSubject ? result→enrichment (shown as enrichment←result) : result←enrichment (shown as enrichment→result)
+    // Arrow directions based on subject/object relationships
+    // inputIsSubject: true = Input→Lookup, false = Input←Lookup
+    // lookupIsSubject: true = Lookup→Enrichment, false = Lookup←Enrichment
+    // enrichmentIsSubjectToResult: true = Enrichment→Result, false = Enrichment←Result
 
     return (
       <div key={sgId} className="bg-white border-2 border-gray-200 rounded-lg p-3">
@@ -636,7 +661,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
               <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred2}</span>
               <div className="flex items-center" style={{ width: '100%' }}>
                 <div className="flex-1 border-t-2 border-purple-600"></div>
-                <span className="text-purple-600 font-bold text-lg mx-1">{lookupIsSubjectToEnrichment ? '→' : '←'}</span>
+                <span className="text-purple-600 font-bold text-lg mx-1">{lookupIsSubject ? '→' : '←'}</span>
               </div>
             </div>
             
@@ -648,7 +673,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
               <span className="text-xs text-gray-600 whitespace-nowrap mb-1">{pred3}</span>
               <div className="flex items-center" style={{ width: '100%' }}>
                 <div className="flex-1 border-t-2 border-purple-600"></div>
-                <span className="text-purple-600 font-bold text-lg mx-1">{resultIsSubject ? '←' : '→'}</span>
+                <span className="text-purple-600 font-bold text-lg mx-1">{enrichmentIsSubjectToResult ? '→' : '←'}</span>
               </div>
             </div>
             
@@ -818,33 +843,6 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
 
                     return (
                       <div className="space-y-4">
-                        {/* Inferred Edge */}
-                        {/* <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
-                          <div className="font-semibold text-blue-900 mb-3 text-base">
-                            Inferred Edge
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Subject:</span>
-                              <span className="text-sm text-gray-900">
-                                {knowledgeGraph?.nodes[edge.subject]?.name || edge.subject}
-                              </span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Predicate:</span>
-                              <span className="text-sm font-semibold text-purple-700">
-                                {edge.predicate?.replace('biolink:', '').replace(/_/g, ' ') || 'N/A'}
-                              </span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="text-sm font-semibold text-gray-700 min-w-[80px]">Object:</span>
-                              <span className="text-sm text-gray-900">
-                                {knowledgeGraph?.nodes[edge.object]?.name || edge.object}
-                              </span>
-                            </div>
-                          </div>
-                        </div> */}
-
                         {/* Indirect Paths */}
                         {supportGraphs.length > 0 ? (
                           <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">

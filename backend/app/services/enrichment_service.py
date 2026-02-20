@@ -9,7 +9,7 @@ import asyncio
 import httpx
 from app.models.enrichment import *
 
-AC_URL = "https://answercoalesce.renci.org/query"
+AC_URL = "https://answercoalesce-test.apps.renci.org/query"
 
 class Job:
     def __init__(self, job_id: str, user_id: str, request: EnrichmentAnalysisRequest):
