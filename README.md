@@ -63,11 +63,6 @@ npm install
 Edit `backend/app/core/config.py` or set environment variables:
 
 ```python
-# Neo4j
-# NEO4J_URI = "bolt://localhost:7687"
-# NEO4J_USER = "neo4j"
-# NEO4J_PASSWORD = "passwordhere"
-
 # # Redis
 # REDIS_URL = "redis://localhost:6379"
 
@@ -318,8 +313,8 @@ This project is part of the Biomedical Data Translator Consortium.
 
 ## Support
 
-- Documentation: Check README files in `backend/` and `frontend/`
-- API Docs: http://localhost:8000/api/docs
+- Documentation: Check README files in [`backend/`](README.md) and [`frontend/`](frontend/README.md)
+<!-- - API Docs: http://localhost:8000/api/docs -->
 - Issues: Report bugs and request features via GitHub issues
 
 ## Acknowledgments
