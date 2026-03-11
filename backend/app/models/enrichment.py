@@ -61,20 +61,11 @@ class QueryMessage(BaseModel):
 
 class EnrichmentParameters(BaseModel):
     """EDGAR-specific parameters"""
-    pvalue_threshold: float = Field(default=1e-5, ge=0.0, le=1.0)
-    max_results: int = Field(default=100, ge=1, le=10000)
-    predicate_constraints: List[str] = Field(
-        default_factory=lambda: [
-            "biolink:causes",
-            "biolink:biomarker_for",
-            "biolink:contraindicated_for",
-            "biolink:contraindicated_in",
-            "biolink:contributes_to",
-            "biolink:has_adverse_event",
-            "biolink:causes_adverse_event",
-            "biolink:similar_to"
-        ]
-    )
+    pvalue_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    max_rules: Optional[int] = Field(default=None, ge=1, le=10000)
+    max_results: Optional[int] = Field(default=None, ge=1, le=10000)
+    predicate_constraints: Optional[List[str]] = None
+    predicate_constraint_style: Optional[str] = None  # "include" or "exclude"
 
 
 class EnrichmentAnalysisRequest(BaseModel):
@@ -115,17 +106,7 @@ class EnrichmentAnalysisRequest(BaseModel):
                     }
                 },
                 "parameters": {
-                    "pvalue_threshold": 1e-5,
-                    "result_length": 100,
-                    "predicates_to_exclude": [
-                        "biolink:causes",
-                        "biolink:biomarker_for",
-                        "biolink:contraindicated_for",
-                        "biolink:contraindicated_in",
-                        "biolink:contributes_to",
-                        "biolink:has_adverse_event",
-                        "biolink:causes_adverse_event"
-                    ]
+                    "pvalue_threshold": 1e-5
                 }
             }
         }

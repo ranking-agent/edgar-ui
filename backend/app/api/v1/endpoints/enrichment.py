@@ -1,7 +1,3 @@
-"""
-EDGAR Enrichment analysis endpoints
-Returns full TRAPI response from AnswerCoalesce
-"""
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
