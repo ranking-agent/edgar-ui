@@ -3,6 +3,7 @@ import { enrichmentAPI } from '../utils/api';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { ResultPathViewer } from './ResultPathViewer';
 import { ErrorBoundary } from './ErrorBoundary';
+import { PipelineInsights } from './PipelineInsights';
 
 // Node Chip Component - Expandable for multiple members
 const NodeChip: React.FC<{ 
@@ -188,6 +189,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
   const knowledgeGraph = results.message.knowledge_graph;
   const auxiliaryGraphs = results.message.auxiliary_graphs;
   const queryGraph = results.message.query_graph;
+  const logs = results.logs || results.message?.logs || [];
 
   // Extract query input curie and query graph predicate
   const queryInputIds = new Set<string>();
@@ -890,6 +892,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
   return (
     <div className="bg-white rounded-xl shadow-lg">
       <div className="p-6 space-y-6">
+        {/* Pipeline Insights - shows when results are limited */}
+        <PipelineInsights logs={logs} totalResults={totalResults} />
         {/* Stats - Clickable cards replace tabs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           

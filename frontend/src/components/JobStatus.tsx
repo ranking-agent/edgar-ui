@@ -134,7 +134,7 @@ const PIPELINE_STAGES = [
 const getStageStatus = (logs: PipelineLog[], stageKey: string) => {
   const log = logs.find(l => l.message === stageKey);
   if (!log) return { status: 'pending', log: null };
-  if (log.level === 'ERROR') return { status: 'error', log };
+  if (log.level?.toLowerCase() === 'error') return { status: 'error', log };
   return { status: 'complete', log };
 };
 
@@ -150,27 +150,48 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
   const [loading, setLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showLogs, setShowLogs] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'polling' | 'reconnecting'>('connecting');
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     let ws: WebSocket | null = null;
     let pollInterval: NodeJS.Timeout;
     let timerInterval: NodeJS.Timeout;
+    let reconnectTimeout: NodeJS.Timeout;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 3000;
 
     const fetchStatus = async () => {
       try {
         const data = await enrichmentAPI.getStatus(jobId);
         setJobData(data);
         setLoading(false);
+        setLastUpdate(new Date());
 
-        if (data.status === 'completed') {
+        // Check if all pipeline stages completed based on logs
+        const pipelineLogs = data.logs || [];
+        const completedStageKeys = PIPELINE_STAGES.map(s => s.key);
+        const allStagesInLogs = completedStageKeys.every(key => 
+          pipelineLogs.some((log: PipelineLog) => log.message === key && log.level?.toLowerCase() !== 'error')
+        );
+        const hasErrorInLogs = pipelineLogs.some((log: PipelineLog) => log.level?.toLowerCase() === 'error');
+
+        // Treat as completed if: status is completed OR (all stages done in logs without errors)
+        const isActuallyCompleted = data.status === 'completed' || (allStagesInLogs && !hasErrorInLogs);
+        const isActuallyFailed = data.status === 'failed' && !allStagesInLogs;
+
+        if (isActuallyCompleted) {
           onComplete(jobId);
           if (ws) ws.close();
           clearInterval(pollInterval);
           clearInterval(timerInterval);
-        } else if (data.status === 'failed') {
+          clearTimeout(reconnectTimeout);
+        } else if (isActuallyFailed || hasErrorInLogs) {
           if (ws) ws.close();
           clearInterval(pollInterval);
           clearInterval(timerInterval);
+          clearTimeout(reconnectTimeout);
         }
       } catch (error) {
         console.error('Error fetching job status:', error);
@@ -178,25 +199,61 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
       }
     };
 
+    const connectWebSocket = () => {
+      try {
+        setConnectionStatus('connecting');
+        ws = createJobWebSocket(jobId, (data) => {
+          setJobData((prev) => ({ ...prev, ...data }));
+          setLastUpdate(new Date());
+          setConnectionStatus('connected');
+          reconnectAttempts = 0; // Reset on successful message
+          
+          if (data.status === 'completed') {
+            onComplete(jobId);
+            if (ws) ws.close();
+            clearInterval(timerInterval);
+          }
+        });
+
+        if (ws) {
+          ws.onopen = () => {
+            setConnectionStatus('connected');
+            reconnectAttempts = 0;
+          };
+
+          ws.onclose = () => {
+            if (jobData?.status !== 'completed' && jobData?.status !== 'failed') {
+              // Attempt reconnection
+              if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                setConnectionStatus('reconnecting');
+                reconnectTimeout = setTimeout(() => {
+                  reconnectAttempts++;
+                  connectWebSocket();
+                }, RECONNECT_DELAY);
+              } else {
+                setConnectionStatus('polling');
+              }
+            }
+          };
+
+          ws.onerror = () => {
+            console.log('WebSocket error, will attempt reconnection');
+          };
+        }
+      } catch (error) {
+        console.log('WebSocket not available, using polling');
+        setConnectionStatus('polling');
+      }
+    };
+
     // Initial fetch
     fetchStatus();
 
     // Setup WebSocket for real-time updates
-    try {
-      ws = createJobWebSocket(jobId, (data) => {
-        setJobData((prev) => ({ ...prev, ...data }));
-        if (data.status === 'completed') {
-          onComplete(jobId);
-          if (ws) ws.close();
-          clearInterval(timerInterval);
-        }
-      });
-    } catch (error) {
-      console.log('WebSocket not available, using polling');
-    }
+    connectWebSocket();
 
-    // Fallback polling - every 2 seconds for more responsive updates
-    pollInterval = setInterval(fetchStatus, 2000);
+    // Fallback polling - every 3 seconds (increased from 2 for stability)
+    pollInterval = setInterval(fetchStatus, 3000);
     
     // Elapsed time counter
     timerInterval = setInterval(() => {
@@ -207,6 +264,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
       if (ws) ws.close();
       clearInterval(pollInterval);
       clearInterval(timerInterval);
+      clearTimeout(reconnectTimeout);
     };
   }, [jobId, onComplete]);
 
@@ -265,15 +323,34 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
     },
   };
 
-  const config = statusConfig[jobData.status as keyof typeof statusConfig] || statusConfig.queued;
-  const Icon = config.icon;
-
   // Parse logs if available
   const logs = jobData.logs || [];
   const hasLogs = logs.length > 0;
   
-  // Find error log if any
-  const errorLog = logs.find(l => l.level === 'ERROR');
+  // Find ALL error logs (level === 'error' or 'ERROR', case-insensitive)
+  const errorLogs = logs.filter(l => l.level?.toLowerCase() === 'error');
+  const hasErrorLogs = errorLogs.length > 0;
+  const errorLog = errorLogs[0]; // Primary error for backward compatibility
+  
+  // Check if ALL pipeline stages completed successfully (based on logs, not status)
+  const completedStages = PIPELINE_STAGES.filter(stage => 
+    logs.some(log => log.message === stage.key && log.level?.toLowerCase() !== 'error')
+  );
+  const allStagesCompleted = completedStages.length === PIPELINE_STAGES.length;
+  
+  // Determine the ACTUAL status based on logs (logs are truth, status might be stale/wrong)
+  const actualStatus = (() => {
+    if (hasErrorLogs) return 'failed';
+    if (allStagesCompleted) return 'completed';
+    return jobData.status;
+  })();
+  
+  // Use actual status for display
+  const config = statusConfig[actualStatus as keyof typeof statusConfig] || statusConfig.queued;
+  const Icon = config.icon;
+  
+  // Show warning if status doesn't match logs
+  const statusMismatch = jobData.status === 'failed' && allStagesCompleted && !hasErrorLogs;
   
   // Find the failed stage
   const getFailedStage = () => {
@@ -282,7 +359,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
     return stage || { label: 'Unknown Stage', icon: AlertCircle, color: 'red' };
   };
 
-  const failedStage = jobData.status === 'failed' ? getFailedStage() : null;
+  const failedStage = (actualStatus === 'failed' || hasErrorLogs) ? getFailedStage() : null;
 
   // Calculate total timing from logs
   const getTotalTiming = () => {
@@ -297,16 +374,61 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
     <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200/60">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-            <Activity className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <Activity className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Job Status</h3>
+              <p className="text-sm text-slate-500 font-mono">
+                {jobData.job_id.substring(0, 12)}...
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">Job Status</h3>
-            <p className="text-sm text-slate-500 font-mono">
-              {jobData.job_id.substring(0, 12)}...
-            </p>
-          </div>
+          
+          {/* Connection Status in Header */}
+          {jobData.status === 'running' && (
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-xs text-slate-400">Last updated</div>
+                <div className="text-xs font-mono text-slate-600">
+                  {lastUpdate.toLocaleTimeString()}
+                </div>
+              </div>
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+                connectionStatus === 'connected' 
+                  ? 'bg-green-100 border border-green-200' 
+                  : connectionStatus === 'reconnecting'
+                    ? 'bg-amber-100 border border-amber-200'
+                    : connectionStatus === 'polling'
+                      ? 'bg-blue-100 border border-blue-200'
+                      : 'bg-slate-100 border border-slate-200'
+              }`}>
+                {connectionStatus === 'connected' ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-green-700 font-medium">Live</span>
+                  </>
+                ) : connectionStatus === 'reconnecting' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 text-amber-600 animate-spin" />
+                    <span className="text-xs text-amber-700 font-medium">Reconnecting...</span>
+                  </>
+                ) : connectionStatus === 'polling' ? (
+                  <>
+                    <Server className="w-3 h-3 text-blue-600" />
+                    <span className="text-xs text-blue-700 font-medium">Polling (3s)</span>
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="w-3 h-3 text-slate-500 animate-spin" />
+                    <span className="text-xs text-slate-600 font-medium">Connecting...</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -446,26 +568,43 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
         </div>
       )}
 
-      {/* Failed Stage Error Details */}
-      {jobData.status === 'failed' && errorLog && (
+      {/* Error Logs Display - Shows when ANY error-level log exists */}
+      {hasErrorLogs && (
         <div className="px-6 pb-6">
-          <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-red-800 mb-1">
-                {failedStage ? `Error in ${failedStage.label} Stage` : 'Pipeline Error'}
+          <div className="space-y-3">
+            {errorLogs.map((errLog, idx) => (
+              <div 
+                key={idx}
+                className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200"
+              >
+                <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-red-800">
+                      {failedStage ? `Error in ${failedStage.label} Stage` : 'Pipeline Error'}
+                    </span>
+                    <span className="px-2 py-0.5 bg-red-200 text-red-800 text-xs font-medium rounded-full uppercase">
+                      {errLog.level}
+                    </span>
+                  </div>
+                  <div className="text-sm text-red-700 mb-2 font-medium">
+                    {errLog.message}
+                  </div>
+                  {errLog.metadata && (
+                    <details className="mt-2">
+                      <summary className="text-xs text-red-600 cursor-pointer hover:text-red-800 font-medium">
+                        View Error Details
+                      </summary>
+                      <pre className="mt-2 text-xs bg-red-100 text-red-800 p-3 rounded-lg overflow-x-auto max-h-48">
+                        {JSON.stringify(errLog.metadata, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
               </div>
-              <div className="text-xs text-red-700 mb-2">
-                {errorLog.message}
-              </div>
-              {errorLog.metadata && (
-                <pre className="text-xs bg-red-100 text-red-800 p-2 rounded-lg overflow-x-auto">
-                  {JSON.stringify(errorLog.metadata, null, 2)}
-                </pre>
-              )}
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -486,7 +625,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
               {logs.map((log, idx) => {
                 const stage = PIPELINE_STAGES.find(s => s.key === log.message);
                 const StageIcon = stage?.icon || Activity;
-                const isError = log.level === 'ERROR';
+                const isError = log.level?.toLowerCase() === 'error';
                 
                 return (
                   <div 
@@ -650,17 +789,68 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
                 {jobData.message || 'Running EDGAR pipeline...'}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-100 rounded-full">
-              <Wifi className="w-3 h-3 text-purple-500" />
-              <span className="text-xs text-purple-600 font-medium">Connected</span>
+            {/* Connection Status Indicator */}
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${
+              connectionStatus === 'connected' 
+                ? 'bg-green-100' 
+                : connectionStatus === 'reconnecting'
+                  ? 'bg-amber-100'
+                  : 'bg-purple-100'
+            }`}>
+              {connectionStatus === 'connected' ? (
+                <>
+                  <Wifi className="w-3 h-3 text-green-500" />
+                  <span className="text-xs text-green-600 font-medium">Live</span>
+                </>
+              ) : connectionStatus === 'reconnecting' ? (
+                <>
+                  <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />
+                  <span className="text-xs text-amber-600 font-medium">Reconnecting</span>
+                </>
+              ) : connectionStatus === 'polling' ? (
+                <>
+                  <Server className="w-3 h-3 text-purple-500" />
+                  <span className="text-xs text-purple-600 font-medium">Polling</span>
+                </>
+              ) : (
+                <>
+                  <Wifi className="w-3 h-3 text-purple-500" />
+                  <span className="text-xs text-purple-600 font-medium">Connecting</span>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* AnswerCoalesce Error Details - when no logs available */}
-      {jobData.status === 'failed' && !hasLogs && jobData.message?.toLowerCase().includes('answercoalesce') && (
-        <div className="px-6 pb-6">
+      {/* Status Mismatch Warning - logs show success but status says failed */}
+      {statusMismatch && (
+        <div className="px-6 pb-4">
+          <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-amber-800 mb-1">
+                Status Discrepancy Detected
+              </div>
+              <div className="text-xs text-amber-700 mb-2">
+                The pipeline logs show all stages completed successfully, but the job status indicates failure. 
+                This may be a transient error. The results should still be available.
+              </div>
+              {jobData.message && (
+                <div className="text-xs bg-amber-100 text-amber-800 p-2 rounded-lg font-mono">
+                  Reported error: {jobData.message}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AnswerCoalesce Error Context - only show when actualStatus is failed */}
+      {actualStatus === 'failed' && jobData.message?.toLowerCase().includes('answercoalesce') && (
+        <div className="px-6 pb-4">
           <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
               <AlertTriangle className="w-5 h-5 text-white" />
@@ -671,7 +861,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
               </div>
               <div className="text-xs text-amber-700 mb-3">
                 The AnswerCoalesce service encountered an error while processing your query. 
-                This is not an issue with EDGAR.
+                This is not an issue with EDGAR. See error details below.
               </div>
               <div className="text-xs text-amber-600">
                 <div className="font-semibold mb-1.5">Suggestions:</div>
@@ -686,8 +876,27 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
         </div>
       )}
 
-      {/* Generic Error Details - when no logs and not AnswerCoalesce error */}
-      {jobData.status === 'failed' && !hasLogs && !jobData.message?.toLowerCase().includes('answercoalesce') && (
+      {/* Show the actual error message from jobData.message - only when actualStatus is failed */}
+      {actualStatus === 'failed' && jobData.message && (
+        <div className="px-6 pb-4">
+          <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <XCircle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-red-800 mb-1">
+                Error Message
+              </div>
+              <div className="text-sm text-red-700 font-mono bg-red-100 p-3 rounded-lg overflow-x-auto">
+                {jobData.message}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generic failure notice - only when no message at all and actualStatus is failed */}
+      {actualStatus === 'failed' && !jobData.message && !hasErrorLogs && (
         <div className="px-6 pb-6">
           <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
             <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -698,7 +907,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
                 Analysis Failed
               </div>
               <div className="text-xs text-red-700">
-                {jobData.message || 'An unknown error occurred'}
+                An unknown error occurred. Please try again.
               </div>
             </div>
           </div>

@@ -73,7 +73,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Main Content - Wider layout with centered QueryBuilder */}
-      {queryBuilderExpanded && !completedJobId && (
+      {queryBuilderExpanded && (
         <div className="grid gap-6 lg:grid-cols-5">
           {/* Left Column - Query Builder (wider: 3/5) */}
           <div className="lg:col-span-3 space-y-4">

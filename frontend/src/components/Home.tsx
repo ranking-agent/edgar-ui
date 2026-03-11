@@ -10,7 +10,7 @@ import { BYOResponseData } from './BYOResponseData';
 // import { JobHistory } from './JobHistory';
 import { ScrollButtons } from './ScrollButtons';
 
-type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' ;
+type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' ;//| 'history' ;
 
 export const Home: React.FC = () => {
   const { logout } = useAuth();
@@ -23,7 +23,7 @@ export const Home: React.FC = () => {
   const navigationItems = [
     { id: 'home' as Page, label: 'Home', icon: HomeIcon },
     { id: 'dashboard' as Page, label: 'EDGAR Dashboard', icon: GitGraph },
-    { id: 'enrichment' as Page, label: 'Enrichment Analysis', icon: BarChart3 },
+    { id: 'enrichment' as Page, label: 'Enrichment Analysis', icon: BarChart3, external: 'https://robokop.renci.org/explore/enrichment-analysis' },
     { id: 'normalize' as Page, label: 'Normalize Node', icon: AlignHorizontalDistributeCenter },
     { id: 'lookup' as Page, label: 'Resolve Name', icon: Table },
     { id: 'byo' as Page, label: 'Import Data', icon: Upload },
@@ -178,9 +178,13 @@ export const Home: React.FC = () => {
           <div className="relative max-w-[1440px] mx-auto px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                <button 
+                  onClick={() => setCurrentPage('home')}
+                  className="text-2xl font-bold tracking-tight text-white hover:text-purple-200 transition-colors cursor-pointer"
+                  style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}
+                >
                   EDGAR
-                </h1>
+                </button>
                 <span className="hidden sm:block w-px h-6 bg-white/30" />
                 <span className="hidden sm:block text-sm font-medium text-purple-100">
                   Enrichment-Driven Graph Reasoner
@@ -209,7 +213,13 @@ export const Home: React.FC = () => {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
+                    onClick={() => {
+                      if (item.external) {
+                        window.open(item.external, '_blank');
+                      } else {
+                        setCurrentPage(item.id);
+                      }
+                    }}
                     className={`
                       flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap 
                       transition-all duration-200 text-sm
@@ -357,7 +367,7 @@ export const Home: React.FC = () => {
         }} />} */}
       </main>
 
-      {/* ROBOKOP-style Dark Footer */}
+      {/* Dark Footer */}
       <footer className="bg-gradient-to-r from-slate-900 to-slate-950 text-white">
         {/* Top accent line */}
         <div className="h-0.5 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
