@@ -357,11 +357,18 @@ export const Home: React.FC = () => {
           </div>
         )}
 
-        {currentPage === 'dashboard' && <Dashboard />}
-        {currentPage === 'enrichment' && <EnrichmentAnalysis />}
-        {currentPage === 'normalize' && <NormalizeNode />}
-        {currentPage === 'lookup' && <ResolveName />}
-        {currentPage === 'byo' && <BYOResponseData />}
+        <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
+          <Dashboard />
+        </div>
+        <div style={{ display: currentPage === 'normalize' ? 'block' : 'none' }}>
+          <NormalizeNode />
+        </div>
+        <div style={{ display: currentPage === 'lookup' ? 'block' : 'none' }}>
+          <ResolveName />
+        </div>
+        <div style={{ display: currentPage === 'byo' ? 'block' : 'none' }}>
+          <BYOResponseData />
+        </div>
         {/* {currentPage === 'history' && <JobHistory onSelectJob={(jobId) => {
           setCurrentPage('dashboard');
         }} />} */}

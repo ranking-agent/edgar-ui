@@ -32,11 +32,11 @@ const EXAMPLE_QUERIES = [
     exampleIsTarget: true
   },
   {
-    label: 'Genes associated with a Disease',
-    description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
-    value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
-    example: 'DOID:0050430',
-    exampleIsTarget: true
+    label: 'Phenotypes of a Gene',
+    description: 'e.g., NCBIGene:122481',
+    value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
+    example: 'NCBIGene:122481',
+    exampleIsTarget: false
   },
   {
     label: 'Phenotypes of a Disease',
@@ -46,19 +46,21 @@ const EXAMPLE_QUERIES = [
     exampleIsTarget: false
   },
   {
+    label: 'Genes associated with a Disease',
+    description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
+    value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
+    example: 'DOID:0050430',
+    exampleIsTarget: true
+  },
+  
+  {
     label: 'Genes affecting a Phenotype',
     description: 'e.g., HP:0003637 (Myasthenia)',
     value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
     example: 'HP:0003637',
     exampleIsTarget: true
   },
-  {
-    label: 'Phenotypes of a Gene',
-    description: 'e.g., NCBIGene:122481',
-    value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
-    example: 'NCBIGene:122481',
-    exampleIsTarget: false
-  }
+  
 ];
 
 interface QueryBuilderProps {

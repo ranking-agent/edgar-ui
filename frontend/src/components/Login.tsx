@@ -3,26 +3,30 @@ import { LogIn, Database, Eye, EyeOff, AlertCircle, Loader2, ExternalLink } from
 import { useAuth } from '../contexts/AuthContext';
 
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // const [username, setUsername] = useState('');
+  // const [password, setPassword] = useState('');
+  // const [showPassword, setShowPassword] = useState(false);
+  // const [error, setError] = useState('');
+  // const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { continueAsGuest } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+// Button:
 
-    try {
-      await login(username, password);
-    } catch (err) {
-      setError('Invalid credentials. Please check your username and password.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError('');
+  //   setLoading(true);
+
+  //   try {
+  //     await login(username, password);
+  //   } catch (err) {
+  //     setError('Invalid credentials. Please check your username and password.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -145,8 +149,26 @@ export const Login: React.FC = () => {
                 </h1>
               </div>
             </div>
-
             <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 p-8">
+  <div className="text-center mb-8">
+    <div className="hidden lg:flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mx-auto mb-4 shadow-lg shadow-purple-500/25">
+      <Database className="w-8 h-8 text-white" />
+    </div>
+    <h2 className="text-2xl font-bold text-slate-900 mb-2" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
+      Welcome to EDGAR
+    </h2>
+    <p className="text-slate-500">Enrichment-Driven Graph Analysis & Reasoning</p>
+  </div>
+
+  <button
+  onClick={continueAsGuest}
+  className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-300 flex items-center justify-center gap-2"
+>
+  Continue
+  <LogIn className="w-5 h-5" />
+</button>
+</div>
+            {/* <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 p-8">
               <div className="text-center mb-8">
                 <div className="hidden lg:flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mx-auto mb-4 shadow-lg shadow-purple-500/25">
                   <LogIn className="w-8 h-8 text-white" />
@@ -237,7 +259,7 @@ export const Login: React.FC = () => {
 
             <p className="text-center text-sm text-slate-500 mt-6">
               Protected by enterprise-grade security
-            </p>
+            </p> */}
           </div>
         </div>
       </div>

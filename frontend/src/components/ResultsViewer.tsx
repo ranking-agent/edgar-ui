@@ -898,24 +898,25 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           
           {/* Inferred Results - Clickable to show all results */}
-          <button
-            onClick={() => {
-              setActiveTab('inferred');
-              setSelectedRule(null);
-              setShowAllResults(true);
-              onTabChange?.('inferred');
-            }}
-            className={`text-left border-2 rounded-lg p-4 transition-all ${
-              activeTab === 'inferred' && showAllResults
-                ? 'bg-purple-100 border-purple-500 shadow-md'
-                : 'bg-purple-50 border-purple-300 hover:bg-purple-100'
-            }`}
-          >
-            <div className="text-sm text-purple-700 font-semibold mb-1">Inferred Results</div>
-            <div className="text-3xl font-bold text-purple-900">{totalResults}</div>
-          </button>
-          
-          {/* Enrichment--Inference Rules - Clickable */}
+          {/* Inferred Results - Clickable to show all results */}
+<button
+  onClick={() => {
+    setActiveTab('inferred');
+    setSelectedRule(null);
+    setShowAllResults(true);
+    onTabChange?.('inferred');
+  }}
+  className={`text-left border-2 rounded-lg p-4 transition-all ${
+    activeTab === 'inferred' && showAllResults
+      ? 'bg-purple-100 border-purple-600 shadow-lg ring-2 ring-purple-300'
+      : 'bg-purple-50 border-purple-200 hover:bg-purple-100 opacity-70'
+  }`}
+>
+  <div className="text-sm text-purple-700 font-semibold mb-1">Inferred Results</div>
+  <div className="text-3xl font-bold text-purple-900">{totalResults}</div>
+</button>
+
+{/* Enrichment--Inference Rules - Clickable */}
           <button
             onClick={() => {
               setActiveTab('inferred');
@@ -925,15 +926,15 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
             }}
             className={`text-left border-2 rounded-lg p-4 transition-all ${
               activeTab === 'inferred' && !showAllResults
-                ? 'bg-blue-100 border-blue-500 shadow-md'
-                : 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+                ? 'bg-blue-100 border-blue-600 shadow-lg ring-2 ring-blue-300'
+                : 'bg-blue-50 border-blue-200 hover:bg-blue-100 opacity-70'
             }`}
           >
             <div className="text-sm text-blue-700 font-semibold mb-1">Enrichment--Inference Rules</div>
             <div className="text-3xl font-bold text-blue-900">{sortedRules.length}</div>
           </button>
 
-           {/* Lookup Results - Clickable */}
+          {/* Lookup Results - Clickable */}
           <button
             onClick={() => {
               setActiveTab('direct');
@@ -942,8 +943,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
             }}
             className={`text-left border-2 rounded-lg p-4 transition-all ${
               activeTab === 'direct'
-                ? 'bg-green-50 border-green-500 shadow-md'
-                : 'bg-white border-green-300 hover:bg-green-50'
+                ? 'bg-green-100 border-green-600 shadow-lg ring-2 ring-green-300'
+                : 'bg-green-50 border-green-200 hover:bg-green-100 opacity-70'
             }`}
           >
             <div className="text-sm text-green-700 font-semibold mb-1">Lookup Results</div>

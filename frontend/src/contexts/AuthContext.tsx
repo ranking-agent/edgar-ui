@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authAPI } from '../utils/api';
 
+// interface AuthContextType {
+//   isAuthenticated: boolean;
+//   login: (username: string, password: string) => Promise<void>;
+//   logout: () => Promise<void>;
+//   loading: boolean;
+// }
 interface AuthContextType {
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  continueAsGuest: () => void;  // Add this
   loading: boolean;
 }
 
@@ -22,6 +29,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setLoading(false);
   }, []);
+
+  const continueAsGuest = () => {
+    localStorage.setItem('auth_token', 'guest');
+    setIsAuthenticated(true);
+  };
 
   const login = async (username: string, password: string) => {
     try {
@@ -43,12 +55,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsAuthenticated(false);
     }
   };
-
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated, login, logout, continueAsGuest, loading }}>
       {children}
     </AuthContext.Provider>
   );
+  // return (
+  //   <AuthContext.Provider value={{ isAuthenticated, login, logout, loading }}>
+  //     {children}
+  //   </AuthContext.Provider>
+  // );
 };
 
 export const useAuth = () => {
