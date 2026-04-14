@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Info,  
   ChevronUp, 
@@ -11,10 +11,25 @@ import { QueryBuilder } from './QueryBuilder';
 import { JobStatus } from './JobStatus';
 import { ResultsViewer } from './ResultsViewer';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  initialJobId?: string | null;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
   const [previewQuery, setPreviewQuery] = useState<any>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+  const [completedJobId, setCompletedJobId] = useState<string | null>(initialJobId ?? null);
+
+  useEffect(() => {
+    if (initialJobId) {
+      setCompletedJobId(initialJobId);
+      setCurrentJobId(null);
+      setResultsData(null);
+      setSelectedRuleKey(null);
+      setFilteredResultIndices([]);
+      setQueryBuilderExpanded(false);
+    }
+  }, [initialJobId]);
   const [resultsData, setResultsData] = useState<any>(null);
   const [selectedRuleKey, setSelectedRuleKey] = useState<string | null>(null);
   const [filteredResultIndices, setFilteredResultIndices] = useState<number[]>([]);

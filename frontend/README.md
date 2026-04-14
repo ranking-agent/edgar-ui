@@ -1,114 +1,93 @@
 # EDGAR Frontend
 
-Modern React/TypeScript frontend for the EDGAR (Enrichment-Driven GrAph Reasoner) biomedical knowledge graph analysis platform.
+React + TypeScript frontend for EDGAR (Enrichment-Driven GrAph Reasoner), a biomedical knowledge graph analysis platform.
 
 ## Features
 
-- **Authentication**: Secure login/logout system
-- **Query Builder**: Interactive interface for building TRAPI queries with multiple use cases:
+- **Authentication** — login/logout flow
+- **Query Builder** — interactive TRAPI query construction with preset use cases:
   - Drug Repurposing
   - Gene Discovery
   - Function Prediction
   - Pathway Analysis
   - Target Identification
-- **Real-time Job Tracking**: WebSocket-based status updates with progress indicators
-- **Results Visualization**: 
+- **Job Tracking** — 3-second polling with progress bar and per-stage pipeline visualization
+- **Results Visualization**
   - Overview statistics
-  - Interactive bar charts showing top results
+  - Interactive bar charts for top results
   - Knowledge graph exploration
   - Analysis logs
-<!-- - **Job History**: Browse and reload previous analyses -->
-- **Responsive Design**: Works on desktop and mobile devices
+- **Job History** — browse previous analyses and reopen completed jobs in the dashboard
+- **Responsive Design**
 
 ## Tech Stack
 
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **Tailwind CSS** for styling
-- **Recharts** for data visualization
-- **Axios** for API communication
-- **Lucide React** for icons
+- React 18 + TypeScript
+- Vite
+- Tailwind CSS
+- Recharts (charts)
+- Cytoscape.js (knowledge graph)
+- Axios
+- Lucide React (icons)
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+ and npm
-- EDGAR backend running on `http://localhost:8000`
-
-### Installation
+Prerequisites: Node.js 18+ and a running EDGAR backend at `http://localhost:8000`.
 
 ```bash
 cd frontend
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+Available at http://localhost:5173.
 
-### Build for Production
-
-```bash
-npm run build
-```
-
-The optimized build will be in the `dist/` directory.
-
-### Preview Production Build
+### Build
 
 ```bash
-npm run preview
+npm run build     # outputs to dist/
+npm run preview   # serve the production build locally
 ```
 
 ## Usage
 
 ### Login
-<!-- 
-Use the demo credentials:
-- Username: `demo`
-- Password: `demo` -->
+
+Ask a maintainer for demo credentials.
 
 ### Submit a Query
 
-1. Select a use case (e.g., Drug Repurposing) OR Enter an entity ID in CURIE format (e.g., `MONDO:0005148` for Type 2 Diabetes)
-3. Adjust advanced parameters if needed:
-   - P-value threshold (default: 1e-5)
-   - Maximum results (default: 100)
-4. Click "Run Enrichment Analysis"
+1. Select a use case (e.g., Drug Repurposing), **or** enter an entity ID in CURIE format (e.g., `MONDO:0005148` for Type 2 Diabetes).
+2. Adjust advanced parameters if needed:
+   - P-value threshold (default: `1e-5`)
+   - Maximum results (default: `100`)
+3. Click **Run Enrichment Analysis**.
 
 ### Monitor Progress
 
-- Status indicators: Queued → Running → Completed/Failed
-- Progress bar during analysis
+- Status: Queued → Running → Completed / Failed
+- Progress bar updates every 3 seconds
+- Pipeline stage icons show Lookup → Enrichment → Inference → Finalization → Response
 
 ### View Results
 
-Once complete, explore:
-- **Overview**: Summary statistics and query graph
-- **Results**: Interactive chart and detailed list of ranked results
-- **Knowledge Graph**: Explore nodes and edges
-- **Logs**: Analysis execution logs
+- **Overview** — summary statistics and query graph
+- **Results** — interactive chart and ranked result list
+- **Knowledge Graph** — node/edge exploration
+- **Logs** — execution details per stage
 
 ### Job History
 
-- Click "Job History" in the header
-- View all previous analyses
-- Click "View Results" on completed jobs to reload them
+Open **Job History** in the nav, then click **View** on a completed job to load it in the dashboard.
 
 ## API Configuration
 
-The API base URL is configured in `src/utils/api.ts`:
+The API base URL is derived at runtime in [src/utils/api.ts](src/utils/api.ts):
 
-```typescript
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-```
+- `localhost` → `http://localhost:8000/api/v1`
+- any other host → `<origin>/api/v1`
 
-Update this if backend is running on a different address.
+The built bundle is therefore environment-agnostic and works behind any reverse proxy that exposes `/api/v1`.
 
 ## Project Structure
 
@@ -116,58 +95,43 @@ Update this if backend is running on a different address.
 frontend/
 ├── src/
 │   ├── components/
-│   │   ├── Dashboard.tsx      # Main dashboard layout
-│   │   ├── Login.tsx          # Login page
-│   │   ├── QueryBuilder.tsx   # Query creation interface
-│   │   ├── JobStatus.tsx      # Real-time job monitoring
-│   │   ├── ResultsViewer.tsx  # Results visualization
-│   │   └── JobHistory.tsx     # Job history list
-│   ├── contexts/
-│   │   └── AuthContext.tsx    # Authentication state management
-│   ├── utils/
-│   │   └── api.ts             # API client and utilities
-│   ├── types/
-│   │   └── index.ts           # TypeScript type definitions
-│   ├── App.tsx                # Root component
-│   ├── main.tsx               # Entry point
-│   └── index.css              # Global styles
-├── public/                    # Static assets
-├── index.html                 # HTML template
-├── package.json               # Dependencies
-├── tsconfig.json              # TypeScript config
-├── vite.config.ts             # Vite config
-└── tailwind.config.js         # Tailwind CSS config
+│   │   ├── Home.tsx           # top-level layout + navigation
+│   │   ├── Dashboard.tsx      # query builder + status + results
+│   │   ├── Login.tsx
+│   │   ├── QueryBuilder.tsx
+│   │   ├── JobStatus.tsx      # poll-driven job progress
+│   │   ├── ResultsViewer.tsx
+│   │   ├── JobHistory.tsx
+│   │   └── ...
+│   ├── contexts/              # auth state
+│   ├── utils/api.ts           # API client
+│   ├── types/                 # TypeScript definitions
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── index.css
+├── public/
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── tailwind.config.js
 ```
 
-## Development Notes
+## Implementation Notes
 
-### WebSocket Support
-
-The application uses WebSockets for real-time job updates. If WebSocket connection fails, it automatically falls back to polling every 3 seconds.
-
-### Error Handling
-
-- API errors are displayed in the UI with user-friendly messages
-- Network failures trigger automatic retries where appropriate
-- Authentication errors redirect to login page
-
-### Type Safety
-
-Full TypeScript coverage ensures type safety across the application. All TRAPI types are defined in `src/types/index.ts`.
+- **Polling, not WebSockets.** `JobStatus.tsx` polls `/status/{job_id}` every 3s. A `createJobWebSocket` helper exists in `utils/api.ts` but is not currently wired up.
+- **Type Safety.** TRAPI types live in `src/types/`.
+- **Error Handling.** API errors surface in the UI; auth errors route to login.
 
 ## Customization
 
 ### Styling
 
-Tailwind CSS utility classes are used throughout. Modify `tailwind.config.js` to customize:
-- Colors
-- Spacing
-- Typography
-- Breakpoints
+Tailwind utility classes throughout. Extend theme in `tailwind.config.js`.
 
 ### Use Cases
 
-Add or modify use cases in `QueryBuilder.tsx`:
+Add or modify in `QueryBuilder.tsx`:
 
 ```typescript
 const USE_CASES: UseCase[] = [
@@ -182,4 +146,3 @@ const USE_CASES: UseCase[] = [
   // ...
 ];
 ```
-

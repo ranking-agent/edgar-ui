@@ -67,6 +67,17 @@ export const enrichmentAPI = {
     const response = await api.get(`/enrichment/history?limit=${limit}&offset=${offset}`);
     return response.data;
   },
+
+  getNotifications: async () => {
+    const response = await api.get('/enrichment/notifications');
+    return response.data;
+  },
+
+  markNotificationSeen: async (jobId: string) => {
+    const response = await api.post(`/enrichment/notifications/${jobId}/seen`);
+    return response.data;
+  },
+  
 };
 
 // WebSocket connection for job updates

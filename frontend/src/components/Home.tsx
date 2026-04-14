@@ -4,20 +4,25 @@ import {LogOut, Database, Home as HomeIcon, BarChart3, AlignHorizontalDistribute
 import { useAuth } from '../contexts/AuthContext';
 import { Dashboard } from './Dashboard';
 import { EnrichmentAnalysis } from './EnrichmentAnalysis';
+import { NotificationToast } from './NotificationToast';
 import { NormalizeNode } from './NormalizeNode';
 import { ResolveName } from './NameResolver';
 import { BYOResponseData } from './BYOResponseData';
-// import { JobHistory } from './JobHistory';
+import { JobHistory } from './JobHistory';
 import { ScrollButtons } from './ScrollButtons';
 
-type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' ;//| 'history' ;
+type Page = 'home' | 'dashboard' | 'enrichment' | 'normalize' | 'lookup' | 'byo' | 'history' ;
 
 export const Home: React.FC = () => {
   const { logout } = useAuth();
   const [currentPage, setCurrentPage] = React.useState<Page>('home');
-
+  const [viewJobId, setViewJobId] = React.useState<string | null>(null);
   const handleLogout = async () => {
     await logout();
+  };
+  const handleViewResults = (jobId: string) => {
+    setViewJobId(jobId);
+    setCurrentPage('dashboard');
   };
 
   const navigationItems = [
@@ -27,7 +32,7 @@ export const Home: React.FC = () => {
     { id: 'normalize' as Page, label: 'Normalize Node', icon: AlignHorizontalDistributeCenter },
     { id: 'lookup' as Page, label: 'Resolve Name', icon: Table },
     { id: 'byo' as Page, label: 'Import Data', icon: Upload },
-    // { id: 'history' as Page, label: 'Job History', icon: History },
+    { id: 'history' as Page, label: 'Job History', icon: History },
   ];
 
   const useCases = [
@@ -358,7 +363,7 @@ export const Home: React.FC = () => {
         )}
 
         <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
-          <Dashboard />
+          <Dashboard initialJobId={viewJobId} />
         </div>
         <div style={{ display: currentPage === 'normalize' ? 'block' : 'none' }}>
           <NormalizeNode />
@@ -369,11 +374,14 @@ export const Home: React.FC = () => {
         <div style={{ display: currentPage === 'byo' ? 'block' : 'none' }}>
           <BYOResponseData />
         </div>
-        {/* {currentPage === 'history' && <JobHistory onSelectJob={(jobId) => {
-          setCurrentPage('dashboard');
-        }} />} */}
+        {currentPage === 'history' && (
+          <JobHistory onSelectJob={(jobId) => {
+            setViewJobId(jobId);
+            setCurrentPage('dashboard');
+          }} />
+        )}
       </main>
-
+      <NotificationToast onViewResults={handleViewResults} />
       {/* Dark Footer */}
       <footer className="bg-gradient-to-r from-slate-900 to-slate-950 text-white">
         {/* Top accent line */}
@@ -425,86 +433,6 @@ export const Home: React.FC = () => {
           </div>
         </div>
       </footer>
-      {/* <footer className="relative mt-auto bg-gradient-to-b from-slate-900 to-slate-950 text-white">
-        {/* Top accent line */}
-        {/* <div className="h-1 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
-        
-        <div className="max-w-[1440px] mx-auto px-6 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Brand Column */}
-            {/* <div className="md:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <Database className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold">EDGAR</h3>
-                  <p className="text-xs text-slate-400">v2.0.0</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed max-w-md">
-                Enrichment-Driven Graph Reasoner for explainable biomedical knowledge graph inference. 
-              </p>
-            </div> */}
-
-            {/* Links Column */}
-            {/* <div>
-              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Resources</h4>
-              <ul className="space-y-2">
-                <li>
-                  <a href="https://robokop.renci.org" target="_blank" rel="noopener noreferrer"
-                     className="text-sm text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
-                    ROBOKOP
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
-                <li>
-                  <a href="https://github.com/RobokopU24" target="_blank" rel="noopener noreferrer"
-                     className="text-sm text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
-                    GitHub
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
-              </ul>
-            </div> */}
-
-            {/* Consortium Column */}
-            {/* <div>
-              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Consortium</h4>
-              <ul className="space-y-2">
-                <li>
-                  <a href="https://renci.org" target="_blank" rel="noopener noreferrer"
-                     className="text-sm text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
-                    RENCI
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
-                <li>
-                  <a href="https://ncats.nih.gov/translator" target="_blank" rel="noopener noreferrer"
-                     className="text-sm text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1">
-                    NCATS Translator
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
-              </ul>
-            </div> */}
-          {/* </div> */}
-
-          {/* Bottom section with logos and copyright */}
-          {/* <div className="mt-10 pt-8 border-t border-slate-800">
-              {/* Copyright and funding */}
-              {/* <div className="text-center md:flex-center">
-                <p className="text-xs text-slate-500">
-                  Funded by NCATS Translator (OT2TR002514) and NIH U24ES035214
-                </p>
-                <p className="text-xs text-slate-600">
-                  © {new Date().getFullYear()} RENCI, UNC Chapel Hill. All rights reserved.
-                </p>
-              </div> */}
-          {/* </div>  */}
-        {/* </div>  */}
-      {/* </footer> */} 
-      
     </div>
   );
 };

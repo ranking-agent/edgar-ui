@@ -150,121 +150,47 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
   const [loading, setLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showLogs, setShowLogs] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'polling' | 'reconnecting'>('connecting');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'polling'>('connecting');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
     let pollInterval: NodeJS.Timeout;
     let timerInterval: NodeJS.Timeout;
-    let reconnectTimeout: NodeJS.Timeout;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
-    const RECONNECT_DELAY = 3000;
-
+  
     const fetchStatus = async () => {
       try {
         const data = await enrichmentAPI.getStatus(jobId);
         setJobData(data);
-        setLoading(false);
         setLastUpdate(new Date());
-
-        // Check if all pipeline stages completed based on logs
-        const pipelineLogs = data.logs || [];
-        const completedStageKeys = PIPELINE_STAGES.map(s => s.key);
-        const allStagesInLogs = completedStageKeys.every(key => 
-          pipelineLogs.some((log: PipelineLog) => log.message === key && log.level?.toLowerCase() !== 'error')
-        );
-        const hasErrorInLogs = pipelineLogs.some((log: PipelineLog) => log.level?.toLowerCase() === 'error');
-
-        // Treat as completed if: status is completed OR (all stages done in logs without errors)
-        const isActuallyCompleted = data.status === 'completed' || (allStagesInLogs && !hasErrorInLogs);
-        const isActuallyFailed = data.status === 'failed' && !allStagesInLogs;
-
-        if (isActuallyCompleted) {
+        setConnectionStatus('connected');
+        
+        if (data.status === 'completed') {
           onComplete(jobId);
-          if (ws) ws.close();
           clearInterval(pollInterval);
           clearInterval(timerInterval);
-          clearTimeout(reconnectTimeout);
-        } else if (isActuallyFailed || hasErrorInLogs) {
-          if (ws) ws.close();
+        } else if (data.status === 'failed') {
           clearInterval(pollInterval);
           clearInterval(timerInterval);
-          clearTimeout(reconnectTimeout);
         }
       } catch (error) {
-        console.error('Error fetching job status:', error);
-        setLoading(false);
+        console.error('Status fetch error:', error);
       }
     };
-
-    const connectWebSocket = () => {
-      try {
-        setConnectionStatus('connecting');
-        ws = createJobWebSocket(jobId, (data) => {
-          setJobData((prev) => ({ ...prev, ...data }));
-          setLastUpdate(new Date());
-          setConnectionStatus('connected');
-          reconnectAttempts = 0; // Reset on successful message
-          
-          if (data.status === 'completed') {
-            onComplete(jobId);
-            if (ws) ws.close();
-            clearInterval(timerInterval);
-          }
-        });
-
-        if (ws) {
-          ws.onopen = () => {
-            setConnectionStatus('connected');
-            reconnectAttempts = 0;
-          };
-
-          ws.onclose = () => {
-            if (jobData?.status !== 'completed' && jobData?.status !== 'failed') {
-              // Attempt reconnection
-              if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                setConnectionStatus('reconnecting');
-                reconnectTimeout = setTimeout(() => {
-                  reconnectAttempts++;
-                  connectWebSocket();
-                }, RECONNECT_DELAY);
-              } else {
-                setConnectionStatus('polling');
-              }
-            }
-          };
-
-          ws.onerror = () => {
-            console.log('WebSocket error, will attempt reconnection');
-          };
-        }
-      } catch (error) {
-        console.log('WebSocket not available, using polling');
-        setConnectionStatus('polling');
-      }
-    };
-
+  
     // Initial fetch
     fetchStatus();
-
-    // Setup WebSocket for real-time updates
-    connectWebSocket();
-
-    // Fallback polling - every 3 seconds (increased from 2 for stability)
+    
+    // Poll every 3 seconds
     pollInterval = setInterval(fetchStatus, 3000);
     
     // Elapsed time counter
     timerInterval = setInterval(() => {
       setElapsedTime(prev => prev + 1);
     }, 1000);
-
+  
     return () => {
-      if (ws) ws.close();
       clearInterval(pollInterval);
       clearInterval(timerInterval);
-      clearTimeout(reconnectTimeout);
     };
   }, [jobId, onComplete]);
 
@@ -398,22 +324,15 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
               </div>
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
                 connectionStatus === 'connected' 
-                  ? 'bg-green-100 border border-green-200' 
-                  : connectionStatus === 'reconnecting'
-                    ? 'bg-amber-100 border border-amber-200'
-                    : connectionStatus === 'polling'
-                      ? 'bg-blue-100 border border-blue-200'
-                      : 'bg-slate-100 border border-slate-200'
+                  ? 'bg-amber-100 border border-amber-200'
+                  : connectionStatus === 'polling'
+                    ? 'bg-blue-100 border border-blue-200'
+                    : 'bg-slate-100 border border-slate-200'
               }`}>
                 {connectionStatus === 'connected' ? (
                   <>
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                     <span className="text-xs text-green-700 font-medium">Live</span>
-                  </>
-                ) : connectionStatus === 'reconnecting' ? (
-                  <>
-                    <Loader2 className="w-3 h-3 text-amber-600 animate-spin" />
-                    <span className="text-xs text-amber-700 font-medium">Reconnecting...</span>
                   </>
                 ) : connectionStatus === 'polling' ? (
                   <>
@@ -793,19 +712,12 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${
               connectionStatus === 'connected' 
                 ? 'bg-green-100' 
-                : connectionStatus === 'reconnecting'
-                  ? 'bg-amber-100'
-                  : 'bg-purple-100'
+                : 'bg-purple-100'
             }`}>
               {connectionStatus === 'connected' ? (
                 <>
                   <Wifi className="w-3 h-3 text-green-500" />
                   <span className="text-xs text-green-600 font-medium">Live</span>
-                </>
-              ) : connectionStatus === 'reconnecting' ? (
-                <>
-                  <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />
-                  <span className="text-xs text-amber-600 font-medium">Reconnecting</span>
                 </>
               ) : connectionStatus === 'polling' ? (
                 <>
