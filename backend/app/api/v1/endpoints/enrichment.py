@@ -188,3 +188,28 @@ async def get_job_history(
         )
         for job in jobs
     ]
+
+
+@router.get("/notifications")
+async def get_notifications(
+    current_user: User = Depends(get_current_user),
+    enrichment_service: EnrichmentService = Depends(get_enrichment_service),
+):
+    notifications = await enrichment_service.get_notifications(current_user.id)
+    return {"notifications": notifications}
+
+
+@router.post("/notifications/{job_id}/seen")
+async def mark_seen(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    enrichment_service: EnrichmentService = Depends(get_enrichment_service),
+):
+    job = await enrichment_service.get_job_status(job_id)
+    if job.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+    await enrichment_service.mark_notification_seen(job_id)
+    return {"status": "ok"}

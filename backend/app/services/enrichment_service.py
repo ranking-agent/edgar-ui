@@ -39,6 +39,7 @@ class EnrichmentService:
     def __init__(self):
         self.jobs = {}
         self.results = {}
+        self.completed_notifications = {}
     
     async def validate_request(self, request: EnrichmentAnalysisRequest):
         """Validate TRAPI query structure"""
@@ -268,7 +269,17 @@ class EnrichmentService:
             job.completed_at = datetime.now()
             
             print(f">>> JOB COMPLETED! {num_results} results")
-            
+            # Store notification for long-running queries (> 30 seconds)
+            elapsed_seconds = (job.completed_at - job.created_at).total_seconds()
+            if elapsed_seconds > 30:
+                self.completed_notifications[job_id] = {
+                    "job_id": job_id,
+                    "user_id": job.user_id,
+                    "num_results": num_results,
+                    "completed_at": job.completed_at.isoformat(),
+                    "elapsed_seconds": int(elapsed_seconds),
+                    "seen": False
+                }
         except Exception as e:
             import traceback
             print(f">>> EXCEPTION: {type(e).__name__}: {e}")
@@ -297,3 +308,16 @@ class EnrichmentService:
         # Sort by created_at descending
         user_jobs.sort(key=lambda j: j.created_at, reverse=True)
         return user_jobs[offset:offset + limit]
+    
+    async def get_notifications(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get unseen completed job notifications for a user"""
+        notifications = []
+        for _, data in self.completed_notifications.items():
+            if data["user_id"] == user_id and not data["seen"]:
+                notifications.append(data)
+        return notifications
+
+    async def mark_notification_seen(self, job_id: str):
+        """Mark a notification as seen"""
+        if job_id in self.completed_notifications:
+            self.completed_notifications[job_id]["seen"] = True
