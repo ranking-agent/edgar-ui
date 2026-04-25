@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from typing import List
 from app.models.enrichment import (
@@ -188,6 +188,23 @@ async def get_job_history(
         )
         for job in jobs
     ]
+
+
+@router.post(
+    "/callback/{job_id}",
+    summary="Callback receiver for AnswerCoalesce async results",
+    include_in_schema=False
+)
+async def receive_ac_callback(
+    job_id: str,
+    result: dict = Body(...),
+    enrichment_service: EnrichmentService = Depends(get_enrichment_service)
+):
+    """Receives the TRAPI result from AC's /asyncquery callback."""
+    accepted = await enrichment_service.receive_callback(job_id, result)
+    if not accepted:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+    return {"status": "received", "job_id": job_id}
 
 
 @router.get("/notifications")

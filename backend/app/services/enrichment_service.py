@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -6,14 +7,27 @@ import httpx
 from app.models.enrichment import *
 
 # AnswerCoalesce endpoints
-AC_BASE_URL = "https://answercoalesce-test.apps.renci.org"
-AC_QUERY_ASYNC = f"{AC_BASE_URL}/query/async"
+AC_BASE_URL = os.environ.get("AC_BASE_URL", "https://answercoalesce-test.apps.renci.org")
+AC_ASYNCQUERY = f"{AC_BASE_URL}/asyncquery"
 AC_QUERY_STATUS = f"{AC_BASE_URL}/query/status"
-AC_QUERY_RESULT = f"{AC_BASE_URL}/query/result"
 
-# Polling configuration
-MAX_WAIT_SECONDS = 1800  # 15 minutes max wait
-POLL_INTERVAL_SECONDS = 3  # Poll every 3 seconds
+# EDGAR's own base URL for callbacks (AC will POST results here)
+EDGAR_BASE_URL = os.environ.get("EDGAR_BASE_URL", "https://edgar-test.apps.renci.org")
+EDGAR_CALLBACK_PATH = "/api/v1/enrichment/callback"
+
+# Fallback polling (used when callback fails or AC doesn't support /asyncquery)
+MAX_WAIT_SECONDS = int(os.environ.get("MAX_WAIT_SECONDS", 3600))
+POLL_INTERVAL_SECONDS = int(os.environ.get("POLL_INTERVAL_SECONDS", 5))
+AC_QUERY_RESULT = f"{AC_BASE_URL}/query/result"
+AC_QUERY_ASYNC = f"{AC_BASE_URL}/query/async"
+
+
+def _format_elapsed(seconds: float) -> str:
+    s = int(seconds)
+    if s < 60:
+        return f"{s}s"
+    m, sec = divmod(s, 60)
+    return f"{m}m {sec}s"
 
 
 class Job:
@@ -26,23 +40,24 @@ class Job:
         self.message = "Job queued"
         self.created_at = datetime.now()
         self.completed_at = None
-        self.logs = []  # Store AC logs if available
-        self.ac_job_id = None  # Track the AnswerCoalesce job ID
+        self.logs = []
+        self.ac_job_id = None
 
 
 class EnrichmentService:
     """
     EDGAR enrichment service.
-    Forwards TRAPI queries to AnswerCoalesce async endpoints and polls for results.
+    Submits TRAPI queries to AnswerCoalesce's /asyncquery with a callback URL.
+    AC processes in the background and POSTs the result to the callback when done.
+    Falls back to polling if the callback approach fails.
     """
-    
+
     def __init__(self):
         self.jobs = {}
         self.results = {}
         self.completed_notifications = {}
-    
+
     async def validate_request(self, request: EnrichmentAnalysisRequest):
-        """Validate TRAPI query structure"""
         if not request.message.query_graph:
             raise ValueError("Query graph is required")
         if not request.message.query_graph.nodes:
@@ -50,267 +65,243 @@ class EnrichmentService:
         if not request.message.query_graph.edges:
             raise ValueError("Query graph must have edges")
         return True
-    
+
     async def create_job(self, user_id: str, request: EnrichmentAnalysisRequest) -> Job:
-        """Create a new enrichment analysis job"""
         job_id = str(uuid.uuid4())
         job = Job(job_id, user_id, request)
         self.jobs[job_id] = job
         return job
-    
+
     async def run_analysis(self, job_id: str):
         """
-        Run enrichment analysis using AnswerCoalesce async endpoints:
-        1. Submit to /query/async - returns immediately with ac_job_id
-        2. Poll /query/status/{ac_job_id} until complete
-        3. Fetch /query/result/{ac_job_id} for full response
+        Submit query to AC's /asyncquery with a callback URL.
+        AC will POST the full TRAPI response to our callback endpoint when done.
+        Falls back to polling if /asyncquery is unavailable.
         """
-        print(f"\n\n>>> RUN_ANALYSIS CALLED FOR {job_id}\n\n")
-        
         job = self.jobs.get(job_id)
         if not job:
-            print(f">>> ERROR: Job {job_id} not found in self.jobs!")
             return
-        
+
         try:
             job.status = JobStatus.RUNNING
-            job.progress = 5
-            job.message = "Preparing query..."
-            
-            request_data = job.request.dict()
-            
-            # ============================================================
-            # STEP 1: Submit query to AnswerCoalesce async endpoint
-            # ============================================================
             job.progress = 10
             job.message = "Submitting query to AnswerCoalesce..."
-            print(f">>> Submitting to {AC_QUERY_ASYNC}") 
-            
-            async with httpx.AsyncClient(timeout=600.0) as client:
+
+            request_data = job.request.dict()
+            callback_url = f"{EDGAR_BASE_URL}{EDGAR_CALLBACK_PATH}/{job_id}"
+            request_data["callback"] = callback_url
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    response = await client.post(AC_QUERY_ASYNC, json=request_data)
-                except httpx.ConnectError as e:
+                    response = await client.post(AC_ASYNCQUERY, json=request_data)
+                except (httpx.ConnectError, httpx.TimeoutException) as e:
+                    # /asyncquery not available — fall back to old polling flow
+                    return await self._run_analysis_polling(job_id)
+
+                if response.status_code == 404:
+                    return await self._run_analysis_polling(job_id)
+
+                if response.status_code not in (200, 202):
                     job.status = JobStatus.FAILED
-                    job.message = "Could not connect to AnswerCoalesce. The service may be down."
+                    job.message = f"AnswerCoalesce rejected query ({response.status_code})"
                     job.progress = 100
-                    print(f">>> Connection error: {e}")
                     return
-                except httpx.TimeoutException:
-                    job.status = JobStatus.FAILED
-                    job.message = "Connection to AnswerCoalesce timed out."
-                    job.progress = 100
-                    print(f">>> Timeout connecting to AC")
-                    return
-                
-                print(f">>> Submit response status: {response.status_code}")
-                
-                if response.status_code != 200:
-                    job.status = JobStatus.FAILED
-                    job.message = f"AnswerCoalesce rejected query ({response.status_code}): {response.text[:200]}"
-                    job.progress = 100
-                    print(f">>> AC rejected query: {response.status_code}")
-                    return
-                
+
                 ac_job_data = response.json()
                 ac_job_id = ac_job_data.get("job_id")
-                
                 if not ac_job_id:
                     job.status = JobStatus.FAILED
                     job.message = "AnswerCoalesce did not return a job ID"
                     job.progress = 100
-                    print(f">>> No job_id in response: {ac_job_data}")
                     return
-                
+
                 job.ac_job_id = ac_job_id
-                print(f">>> AC job submitted successfully: {ac_job_id}")
-            
-            # ============================================================
-            # STEP 2: Poll for completion
-            # ============================================================
-            job.progress = 15
-            job.message = "Query submitted, waiting for AnswerCoalesce to process..."
-            await asyncio.sleep(1)
+
+            job.progress = 20
+            job.message = "Query submitted — waiting for AnswerCoalesce callback..."
+
+            # Wait for callback to deliver the result (with timeout)
             elapsed = 0
-            last_ac_status = "running"
-            
+            while elapsed < MAX_WAIT_SECONDS:
+                if job.status == JobStatus.COMPLETED or job.status == JobStatus.FAILED:
+                    return
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                elapsed += POLL_INTERVAL_SECONDS
+                job.progress = min(20 + int((elapsed / MAX_WAIT_SECONDS) * 70), 89)
+                job.message = f"Processing query... ({_format_elapsed(elapsed)} elapsed)"
+
+            # Timeout — callback never arrived, try fetching directly
+            if job.status == JobStatus.RUNNING:
+                await self._try_fetch_result(job)
+                if job.status != JobStatus.COMPLETED:
+                    job.status = JobStatus.FAILED
+                    job.message = f"Timed out after {MAX_WAIT_SECONDS // 60} minutes"
+                    job.progress = 100
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            job.status = JobStatus.FAILED
+            job.message = f"Analysis failed: {str(e)}"
+            job.progress = 100
+
+    async def receive_callback(self, job_id: str, result: dict):
+        """Called by the callback endpoint when AC delivers the result."""
+        job = self.jobs.get(job_id)
+        if not job:
+            return False
+
+        if "error" in result and result.get("error"):
+            job.status = JobStatus.FAILED
+            job.message = f"AnswerCoalesce failed: {result['error']}"
+            job.progress = 100
+            return True
+
+        self.results[job_id] = result
+        logs = result.get("logs", [])
+        if not logs and "message" in result:
+            logs = result.get("message", {}).get("logs", [])
+        job.logs = logs
+
+        num_results = len(result.get("message", {}).get("results", []))
+        elapsed_seconds = (datetime.now() - job.created_at).total_seconds()
+
+        job.status = JobStatus.COMPLETED
+        job.progress = 100
+        job.completed_at = datetime.now()
+        job.message = f"Analysis completed ({_format_elapsed(elapsed_seconds)}) - {num_results} results"
+
+        if elapsed_seconds > 30:
+            self.completed_notifications[job_id] = {
+                "job_id": job_id,
+                "user_id": job.user_id,
+                "num_results": num_results,
+                "completed_at": job.completed_at.isoformat(),
+                "elapsed_seconds": int(elapsed_seconds),
+                "seen": False
+            }
+        return True
+
+    async def _try_fetch_result(self, job: Job):
+        """Last resort: try to fetch result directly from AC."""
+        if not job.ac_job_id:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.get(f"{AC_QUERY_RESULT}/{job.ac_job_id}")
+                if resp.status_code == 200:
+                    await self.receive_callback(job.id, resp.json())
+        except Exception:
+            pass
+
+    async def _run_analysis_polling(self, job_id: str):
+        """Fallback: use /query/async + polling when /asyncquery is unavailable."""
+        job = self.jobs.get(job_id)
+        if not job:
+            return
+
+        try:
+            request_data = job.request.dict()
+            job.message = "Submitting query (polling mode)..."
+
+            async with httpx.AsyncClient(timeout=600.0) as client:
+                response = await client.post(AC_QUERY_ASYNC, json=request_data)
+
+                if response.status_code != 200:
+                    job.status = JobStatus.FAILED
+                    job.message = f"AnswerCoalesce rejected query ({response.status_code})"
+                    job.progress = 100
+                    return
+
+                ac_job_id = response.json().get("job_id")
+                if not ac_job_id:
+                    job.status = JobStatus.FAILED
+                    job.message = "No job ID returned"
+                    job.progress = 100
+                    return
+                job.ac_job_id = ac_job_id
+
+            job.progress = 15
+            job.message = "Query submitted, polling for completion..."
+            elapsed = 0
+
             async with httpx.AsyncClient(timeout=600.0) as client:
                 while elapsed < MAX_WAIT_SECONDS:
                     try:
-                        status_response = await client.get(f"{AC_QUERY_STATUS}/{ac_job_id}")
-                    except (httpx.ConnectError, httpx.TimeoutException) as e:
-                        # Network blip - keep trying
-                        print(f">>> Status check failed (will retry): {e}")
+                        status_resp = await client.get(f"{AC_QUERY_STATUS}/{ac_job_id}")
+                    except (httpx.ConnectError, httpx.TimeoutException):
                         await asyncio.sleep(POLL_INTERVAL_SECONDS)
                         elapsed += POLL_INTERVAL_SECONDS
                         continue
-                    
-                    if status_response.status_code == 404:
-                        if elapsed < 10:  # Retry for first 10 seconds
-                            print(f">>> AC job {ac_job_id} not found yet, retrying... (elapsed: {elapsed}s)")
-                            await asyncio.sleep(POLL_INTERVAL_SECONDS)
-                            elapsed += POLL_INTERVAL_SECONDS
-                            continue
-                        else:
-                            job.status = JobStatus.FAILED
-                            job.message = "AnswerCoalesce job not found. It may have expired."
-                            job.progress = 100
-                            print(f">>> AC job {ac_job_id} not found (404)")
-                            return
-                    
-                    if status_response.status_code != 200:
-                        print(f">>> Unexpected status check response: {status_response.status_code}")
+
+                    if status_resp.status_code == 404 and elapsed < 10:
                         await asyncio.sleep(POLL_INTERVAL_SECONDS)
                         elapsed += POLL_INTERVAL_SECONDS
                         continue
-                    
-                    status_data = status_response.json()
+
+                    if status_resp.status_code != 200:
+                        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                        elapsed += POLL_INTERVAL_SECONDS
+                        continue
+
+                    status_data = status_resp.json()
                     ac_status = status_data.get("status", "unknown")
-                    ac_error = status_data.get("error")
-                    
-                    print(f">>> AC status: {ac_status} (elapsed: {elapsed}s)")
-                    
+
                     if ac_status == "completed":
                         job.progress = 80
-                        job.message = "AnswerCoalesce complete, fetching results..."
-                        print(f">>> AC job completed!")
-                        await asyncio.sleep(1)
+                        job.message = "Fetching results..."
                         break
-                    
                     elif ac_status == "failed":
                         job.status = JobStatus.FAILED
-                        job.message = f"AnswerCoalesce failed: {ac_error or 'Unknown error'}"
+                        job.message = f"AnswerCoalesce failed: {status_data.get('error', 'Unknown')}"
                         job.progress = 100
-                        print(f">>> AC job failed: {ac_error}")
                         return
-                    
-                    # Update progress message with elapsed time
-                    minutes = elapsed // 60
-                    seconds = elapsed % 60
-                    if minutes > 0:
-                        time_str = f"{minutes}m {seconds}s"
-                    else:
-                        time_str = f"{seconds}s"
-                    
-                    # Progress: 15-80 range during polling
+
                     job.progress = min(15 + int((elapsed / MAX_WAIT_SECONDS) * 65), 79)
-                    job.message = f"Processing query... ({time_str} elapsed)"
-                    
-                    last_ac_status = ac_status
+                    job.message = f"Processing... ({_format_elapsed(elapsed)} elapsed)"
                     await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     elapsed += POLL_INTERVAL_SECONDS
-                
                 else:
-                    # Loop completed without break = timeout
                     job.status = JobStatus.FAILED
-                    job.message = f"AnswerCoalesce timed out after {MAX_WAIT_SECONDS // 60} minutes. Try a simpler query."
+                    job.message = f"Timed out after {MAX_WAIT_SECONDS // 60} minutes"
                     job.progress = 100
-                    print(f">>> AC job timed out after {MAX_WAIT_SECONDS}s")
                     return
-            
-            # ============================================================
-            # STEP 3: Fetch results
-            # ============================================================
-            job.progress = 85
-            job.message = "Fetching results from AnswerCoalesce..."
-            print(f">>> Fetching results from {AC_QUERY_RESULT}/{ac_job_id}")
-            
-            async with httpx.AsyncClient(timeout=600.0) as client:  # Longer timeout for large results
-                try:
-                    result_response = await client.get(f"{AC_QUERY_RESULT}/{ac_job_id}")
-                except httpx.TimeoutException:
+
+            # Fetch result
+            async with httpx.AsyncClient(timeout=600.0) as client:
+                result_resp = await client.get(f"{AC_QUERY_RESULT}/{ac_job_id}")
+                if result_resp.status_code != 200:
                     job.status = JobStatus.FAILED
-                    job.message = "Timed out fetching results. The response may be too large."
+                    job.message = f"Failed to fetch results ({result_resp.status_code})"
                     job.progress = 100
-                    print(f">>> Timeout fetching results")
                     return
-                except httpx.ConnectError as e:
-                    job.status = JobStatus.FAILED
-                    job.message = "Lost connection while fetching results."
-                    job.progress = 100
-                    print(f">>> Connection error fetching results: {e}")
-                    return
-                
-                print(f">>> Result response status: {result_response.status_code}")
-                print(f">>> Result size: {len(result_response.content)} bytes")
-                
-                if result_response.status_code != 200:
-                    job.status = JobStatus.FAILED
-                    job.message = f"Failed to fetch results ({result_response.status_code})"
-                    job.progress = 100
-                    print(f">>> Failed to fetch results: {result_response.status_code}")
-                    return
-                
-                ac_response = result_response.json()
-            
-            # ============================================================
-            # STEP 4: Store results and complete
-            # ============================================================
-            job.progress = 95
-            job.message = "Processing results..."
-            
-            # Extract logs if present
-            logs = ac_response.get("logs", [])
-            if not logs and "message" in ac_response:
-                logs = ac_response.get("message", {}).get("logs", [])
-            job.logs = logs
-            
-            # Store the full response
-            self.results[job_id] = ac_response
-            
-            # Count results
-            num_results = len(ac_response.get("message", {}).get("results", []))
-            if num_results == 0:
-                # Try alternate location
-                num_results = len(ac_response.get("results", []))
-            
-            job.status = JobStatus.COMPLETED
-            job.progress = 100
-            job.message = f"Analysis completed - {num_results} results"
-            job.completed_at = datetime.now()
-            
-            print(f">>> JOB COMPLETED! {num_results} results")
-            # Store notification for long-running queries (> 30 seconds)
-            elapsed_seconds = (job.completed_at - job.created_at).total_seconds()
-            if elapsed_seconds > 30:
-                self.completed_notifications[job_id] = {
-                    "job_id": job_id,
-                    "user_id": job.user_id,
-                    "num_results": num_results,
-                    "completed_at": job.completed_at.isoformat(),
-                    "elapsed_seconds": int(elapsed_seconds),
-                    "seen": False
-                }
+                await self.receive_callback(job_id, result_resp.json())
+
         except Exception as e:
             import traceback
-            print(f">>> EXCEPTION: {type(e).__name__}: {e}")
             traceback.print_exc()
             job.status = JobStatus.FAILED
             job.message = f"Analysis failed: {str(e)}"
             job.progress = 100
 
     async def get_job_status(self, job_id: str) -> Job:
-        """Get job status"""
         job = self.jobs.get(job_id)
         if not job:
             raise ValueError(f"Job {job_id} not found")
         return job
-    
+
     async def get_results(self, job_id: str) -> Dict[str, Any]:
-        """Get full AnswerCoalesce response"""
         results = self.results.get(job_id)
         if not results:
             raise ValueError(f"Results for job {job_id} not found")
         return results
-    
+
     async def get_user_jobs(self, user_id: str, limit: int = 10, offset: int = 0) -> List[Job]:
-        """Get all jobs for a user"""
         user_jobs = [job for job in self.jobs.values() if job.user_id == user_id]
-        # Sort by created_at descending
         user_jobs.sort(key=lambda j: j.created_at, reverse=True)
         return user_jobs[offset:offset + limit]
-    
+
     async def get_notifications(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get unseen completed job notifications for a user"""
         notifications = []
         for _, data in self.completed_notifications.items():
             if data["user_id"] == user_id and not data["seen"]:
@@ -318,6 +309,5 @@ class EnrichmentService:
         return notifications
 
     async def mark_notification_seen(self, job_id: str):
-        """Mark a notification as seen"""
         if job_id in self.completed_notifications:
             self.completed_notifications[job_id]["seen"] = True
