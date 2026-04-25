@@ -11,6 +11,8 @@ import {
 import { QueryBuilder } from './QueryBuilder';
 import { JobStatus } from './JobStatus';
 import { ResultsViewer } from './ResultsViewer';
+import { AC_URL } from '../utils/api';
+
 
 interface DashboardProps {
   initialJobId?: string | null;
@@ -218,7 +220,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
                 <div className="flex items-center gap-2">
                   <Info className="w-4 h-4 text-purple-500" />
                   <span className="text-sm text-purple-700">
-                    Target: <span className="font-mono text-purple-600 text-xs">http://answercoalesce-test.apps.renci.org</span>
+                    Target: <a href={AC_URL} target="_blank" rel="noopener noreferrer" className="font-mono text-purple-600 text-xs underline hover:text-purple-800 transition-colors">{AC_URL}</a>
                   </span>
                 </div>
               </div>

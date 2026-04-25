@@ -23,44 +23,47 @@ const DIRECTION_QUALIFIERS_BY_PREDICATE: Record<string, string[]> = {
   'biolink:regulates': ['upregulated', 'downregulated'],
 };
 
+const DEFAULT_PVALUE = '1e-5';
+const DEFAULT_MAX_RULES = '100';
+
 const EXAMPLE_QUERIES = [
   {
     label: 'Drugs that treat a Disease',
     description: 'e.g., MONDO:0004975 (Alzheimer disease)',
     value: 'biolink:Drug-biolink:treats-biolink:Disease',
     example: 'MONDO:0004975',
-    exampleIsTarget: true
+    exampleIsTarget: true,
   },
   {
     label: 'Phenotypes of a Gene',
     description: 'e.g., NCBIGene:122481',
     value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
     example: 'NCBIGene:122481',
-    exampleIsTarget: false
+    exampleIsTarget: false,
   },
   {
     label: 'Phenotypes of a Disease',
     description: 'e.g., MONDO:0005147 (Type 1 diabetes)',
     value: 'biolink:Disease-biolink:has_phenotype-biolink:PhenotypicFeature',
     example: 'MONDO:0005147',
-    exampleIsTarget: false
+    exampleIsTarget: false,
   },
   {
     label: 'Genes associated with a Disease',
     description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
     value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
     example: 'DOID:0050430',
-    exampleIsTarget: true
+    exampleIsTarget: true,
+    params: { pvalueThreshold: '1e-10'},
   },
-  
   {
     label: 'Genes affecting a Phenotype',
     description: 'e.g., HP:0003637 (Myasthenia)',
     value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
     example: 'HP:0003637',
-    exampleIsTarget: true
+    exampleIsTarget: true,
+    params: { pvalueThreshold: '1e-3', ruleLength: '300' },
   },
-  
 ];
 
 interface QueryBuilderProps {
@@ -100,9 +103,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [directionQualifier, setDirectionQualifier] = useState('');
   const [speciesQualifier, setSpeciesQualifier] = useState('');
   const [showParameters, setShowParameters] = useState(false);
-  const [pvalueThreshold, setPvalueThreshold] = useState('1e-5');
-  const [resultLength, setResultLength] = useState('');  // No default - returns all results
-  const [ruleLength, setRuleLength] = useState('100');   // Default: 100 rules
+  const [pvalueThreshold, setPvalueThreshold] = useState(DEFAULT_PVALUE);
+  const [resultLength, setResultLength] = useState('');
+  const [ruleLength, setRuleLength] = useState(DEFAULT_MAX_RULES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedExample, setSelectedExample] = useState<number | null>(null);
@@ -391,7 +394,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     setPredicate(pred);
     setTargetCategory(target);
     setSelectedExample(idx);
-    
+
     if (exampleIsTarget) {
       setSourceId('');
       setTargetId(exampleId);
@@ -403,6 +406,10 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
       setSourceNormalizedName('');
       setTargetNormalizedName('');
     }
+
+    const params = EXAMPLE_QUERIES[idx].params;
+    setPvalueThreshold(params?.pvalueThreshold ?? DEFAULT_PVALUE);
+    setRuleLength(params?.ruleLength ?? DEFAULT_MAX_RULES);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
