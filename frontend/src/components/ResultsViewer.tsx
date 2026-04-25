@@ -329,8 +329,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
           // 4. Has support_graphs attribute with ARRAY value (has member evidence)
           
           const hasUuid = edge.subject?.startsWith('uuid:') || edge.object?.startsWith('uuid:');
-          const isEnrichmentEdge = 
-            auxEdgeId.startsWith('e_') || auxEdgeId.startsWith('n_') &&
+          const isEnrichmentEdge =
+            (auxEdgeId.startsWith('e_') || auxEdgeId.startsWith('n_')) &&
             !auxEdgeId.includes('member_of') &&
             hasUuid;
           

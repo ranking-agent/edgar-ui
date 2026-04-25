@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Info,  
-  ChevronUp, 
-  Code2, 
-  ArrowLeft,
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Info,
+  ChevronUp,
+  ChevronRight,
+  Code2,
   Copy,
-  Check
+  Check,
+  X
 } from 'lucide-react';
 import { QueryBuilder } from './QueryBuilder';
 import { JobStatus } from './JobStatus';
@@ -19,6 +20,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
   const [previewQuery, setPreviewQuery] = useState<any>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(initialJobId ?? null);
+  const jobStatusRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialJobId) {
@@ -43,6 +45,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
     setSelectedRuleKey(null);
     setFilteredResultIndices([]);
     setQueryBuilderExpanded(true);
+    setTimeout(() => {
+      jobStatusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const handleJobComplete = (jobId: string) => {
@@ -76,19 +81,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
 
   return (
     <div className="space-y-4">
-      {/* Collapsed Query Builder Toggle */}
-      {!queryBuilderExpanded && resultsData && (
+      {/* Collapsed Query Builder Toggle — vertical edge tab pinned to the left */}
+      {!queryBuilderExpanded && completedJobId && (
         <button
           onClick={() => setQueryBuilderExpanded(true)}
-          className="fixed left-6 top-36 z-40 flex items-center gap-2 px-4 py-2.5 bg-white border border-purple-200 rounded-xl shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-200 text-purple-700 hover:text-purple-900 font-medium text-sm"
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-2 py-4 px-2 bg-white border border-l-0 border-purple-200 rounded-r-xl shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-200 text-purple-700 hover:text-purple-900 font-medium text-sm"
+          aria-label="Show Query Builder"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Show Query Builder
+          <ChevronRight className="w-4 h-4" />
+          <span className="[writing-mode:vertical-rl] rotate-180 tracking-wide">
+            Show Query Builder
+          </span>
         </button>
       )}
 
-      {/* Main Content - Wider layout with centered QueryBuilder */}
+      {/* Backdrop when the Query Builder is opened as a side panel over results */}
+      {queryBuilderExpanded && resultsData && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => setQueryBuilderExpanded(false)}
+        />
+      )}
+
+      {/* Main Content - inline when no results; slide-in side panel when results are showing */}
       {queryBuilderExpanded && (
+        <div
+          className={
+            resultsData
+              ? 'fixed top-0 left-0 z-50 h-full w-[95vw] max-w-6xl bg-slate-50 shadow-2xl overflow-y-auto p-6 animate-slide-in-left'
+              : ''
+          }
+          onClick={resultsData ? (e) => e.stopPropagation() : undefined}
+        >
+          {resultsData && (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-slate-900">Query Builder</h2>
+              <button
+                onClick={() => setQueryBuilderExpanded(false)}
+                className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
+                aria-label="Close query builder"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         <div className="grid gap-6 lg:grid-cols-5">
           {/* Left Column - Query Builder (wider: 3/5) */}
           <div className="lg:col-span-3 space-y-4">
@@ -122,7 +158,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
             
             {/* Job Status */}
             {currentJobId && (
-              <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
+              <div ref={jobStatusRef}>
+                <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
+              </div>
             )}
           </div>
 
@@ -186,6 +224,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

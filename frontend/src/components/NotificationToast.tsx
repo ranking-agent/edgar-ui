@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, X, Clock, ArrowRight } from 'lucide-react';
 import { enrichmentAPI } from '../utils/api';
+import { formatElapsed } from '../utils/format';
 
 interface Notification {
   job_id: string;
@@ -41,29 +42,24 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ onViewResu
   }, [dismissed]);
 
   const handleView = async (jobId: string) => {
+    setDismissed(prev => new Set(prev).add(jobId));
+    setNotifications(prev => prev.filter(n => n.job_id !== jobId));
+    onViewResults(jobId);
     try {
       await enrichmentAPI.markNotificationSeen(jobId);
     } catch (e) {
       // Continue anyway
     }
-    setDismissed(prev => new Set(prev).add(jobId));
-    onViewResults(jobId);
   };
 
   const handleDismiss = async (jobId: string) => {
+    setDismissed(prev => new Set(prev).add(jobId));
+    setNotifications(prev => prev.filter(n => n.job_id !== jobId));
     try {
       await enrichmentAPI.markNotificationSeen(jobId);
     } catch (e) {
       // Continue anyway
     }
-    setDismissed(prev => new Set(prev).add(jobId));
-  };
-
-  const formatTime = (seconds: number): string => {
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
   };
 
   if (notifications.length === 0) return null;
@@ -89,7 +85,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ onViewResu
               </p>
               <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
                 <Clock className="w-3 h-3" />
-                <span>Completed in {formatTime(notification.elapsed_seconds)}</span>
+                <span>Completed in {formatElapsed(notification.elapsed_seconds)}</span>
               </div>
               <div className="flex gap-2 mt-3">
                 <button

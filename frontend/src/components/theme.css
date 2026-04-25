@@ -363,3 +363,13 @@ body {
   background: linear-gradient(135deg, var(--color-primary-50) 0%, var(--color-accent-50) 100%);
   border-bottom: 1px solid var(--color-primary-100);
 }
+
+/* Slide-in from the left (for the Query Builder side panel) */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.25s ease-out;
+}

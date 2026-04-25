@@ -53,7 +53,7 @@ npm run preview   # serve the production build locally
 
 ### Login
 
-Ask a maintainer for demo credentials.
+Dev credentials: `demo` / `demo` (hardcoded in the backend for local use).
 
 ### Submit a Query
 
@@ -109,7 +109,7 @@ frontend/
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── index.css
-├── public/
+├── images/
 ├── index.html
 ├── package.json
 ├── tsconfig.json

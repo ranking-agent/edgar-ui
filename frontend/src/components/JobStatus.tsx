@@ -24,6 +24,7 @@ import {
   Package
 } from 'lucide-react';
 import { enrichmentAPI, createJobWebSocket } from '../utils/api';
+import { formatClock } from '../utils/format';
 
 interface JobStatusProps {
   jobId: string;
@@ -194,12 +195,6 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
     };
   }, [jobId, onComplete]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   if (loading || !jobData) {
     return (
       <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-8">
@@ -369,7 +364,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, onComplete }) => {
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-white/50 rounded-full">
                   <Timer className="w-4 h-4 text-slate-500" />
                   <span className="text-sm font-mono text-slate-600">
-                    {formatTime(elapsedTime)}
+                    {formatClock(elapsedTime)}
                   </span>
                 </div>
               )}

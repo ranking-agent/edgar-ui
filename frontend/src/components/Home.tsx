@@ -3,7 +3,7 @@ import {LogOut, Database, Home as HomeIcon, BarChart3, AlignHorizontalDistribute
   History, GitGraph, Dna, Pill, Activity, FlaskConical, ArrowRight, ExternalLink, Network} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Dashboard } from './Dashboard';
-import { EnrichmentAnalysis } from './EnrichmentAnalysis';
+// import { EnrichmentAnalysis } from './EnrichmentAnalysis';
 import { NotificationToast } from './NotificationToast';
 import { NormalizeNode } from './NormalizeNode';
 import { ResolveName } from './NameResolver';

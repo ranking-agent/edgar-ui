@@ -77,14 +77,13 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (..
   };
 }
 
-// Chip component for displaying selected items
-const Chip: React.FC<{ label: string; onRemove: () => void; color?: string }> = ({ label, onRemove, color = 'purple' }) => (
-  <span className={`inline-flex items-center gap-1 px-2 py-1 bg-${color}-100 text-${color}-700 rounded-lg text-xs font-medium`}>
+const Chip: React.FC<{ label: string; onRemove: () => void }> = ({ label, onRemove }) => (
+  <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium">
     {label.replace('biolink:', '')}
     <button
       type="button"
       onClick={onRemove}
-      className={`hover:bg-${color}-200 rounded-full p-0.5 transition-colors`}
+      className="hover:bg-purple-200 rounded-full p-0.5 transition-colors"
     >
       <X className="w-3 h-3" />
     </button>
@@ -99,6 +98,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [predicate, setPredicate] = useState('biolink:treats');
   const [aspectQualifier, setAspectQualifier] = useState('');
   const [directionQualifier, setDirectionQualifier] = useState('');
+  const [speciesQualifier, setSpeciesQualifier] = useState('');
   const [showParameters, setShowParameters] = useState(false);
   const [pvalueThreshold, setPvalueThreshold] = useState('1e-5');
   const [resultLength, setResultLength] = useState('');  // No default - returns all results
@@ -277,7 +277,16 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
 
   const buildTrapiQuery = () => {
     const qualifierConstraints = [];
-  
+
+    if (speciesQualifier) {
+      qualifierConstraints.push({
+        qualifier_set: [{
+          qualifier_type_id: 'biolink:species_context_qualifier',
+          qualifier_value: speciesQualifier,
+        }],
+      });
+    }
+
     if (aspectQualifier || directionQualifier) {
       const qualifierSet: any[] = [];
       if (aspectQualifier) {
@@ -366,6 +375,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     predicate,
     aspectQualifier,
     directionQualifier,
+    speciesQualifier,
     showParameters,
     pvalueThreshold,
     resultLength,
@@ -716,7 +726,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
             {showParameters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
-          {/* Show active defaults when collapsed */}
           {!showParameters && (
             <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
               <div className="flex items-center gap-2 text-xs text-slate-600 mb-2">
@@ -724,6 +733,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                 <span className="font-medium">Active Defaults:</span>
               </div>
               <div className="flex flex-wrap gap-2">
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                  {speciesQualifier ? (speciesQualifier === 'NCBITaxon:9606' ? 'Human' : speciesQualifier === 'NCBITaxon:10090' ? 'Mouse' : 'Rat') : 'All species'}
+                </span>
                 <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-mono">
                   p-value: {pvalueThreshold}
                 </span>
@@ -734,9 +746,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                   Excluding {predicatesToConstrain.length} predicates
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Expand to customize these settings
-              </p>
             </div>
           )}
 
@@ -791,6 +800,24 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                 </div>
               </div>
 
+              {/* Species Context Qualifier */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Species Context
+                </label>
+                <select
+                  value={speciesQualifier}
+                  onChange={(e) => setSpeciesQualifier(e.target.value)}
+                  className="w-full md:w-1/3 px-4 py-2.5 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                >
+                  <option value="">All Species</option>
+                  <option value="NCBITaxon:9606">Human (NCBITaxon:9606)</option>
+                  <option value="NCBITaxon:10090">Mouse (NCBITaxon:10090)</option>
+                  <option value="NCBITaxon:10116">Rat (NCBITaxon:10116)</option>
+                </select>
+                <p className="text-xs text-slate-500">Constrain results to a specific organism</p>
+              </div>
+
               {/* Node Types to Prioritize */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">
@@ -798,7 +825,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
                   <span className="text-slate-400 font-normal ml-1">(optional)</span>
                 </label>
                 <p className="text-xs text-slate-500 mb-2">
-                  These node types will be prioritize in the enrichment analysis
+                  These node types will be prioritized in the enrichment analysis
                 </p>
                 
                 <div className="relative">

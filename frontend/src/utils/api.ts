@@ -111,7 +111,6 @@ export const PREDICATES = ['biolink:treats', 'biolink:affects', 'biolink:regulat
 'biolink:acts_upstream_of_positive_effect',
 'biolink:affects_response_to',
 'biolink:ameliorates',
-'biolink:associated_with',
 'biolink:binds',
 'biolink:capable_of',
 'biolink:catalyzes',
@@ -158,24 +157,25 @@ export const PREDICATES = ['biolink:treats', 'biolink:affects', 'biolink:regulat
 'biolink:positively_correlated_with',
 'biolink:precedes',
 'biolink:produces',
-'biolink:regulates',
 'biolink:related_to',
 'biolink:similar_to',
 'biolink:subclass_of'];
 
 
 export const NODE_CATEGORIES = [
-  'biolink:PhenotypicFeature',
   'biolink:Disease',
-  'biolink:Gene',
-  'biolink:BiologicalProcess',
-  'biolink:ChemicalEntity',
-  'biolink:Disease',
-  'biolink:Gene',
   'biolink:Drug',
+  'biolink:Gene',
+  'biolink:PhenotypicFeature',
   'biolink:BiologicalProcess',
   'biolink:Pathway',
-  'biolink:PhenotypicFeature'
+  'biolink:ChemicalEntity',
+  'biolink:Protein',
+  'biolink:AnatomicalEntity',
+  'biolink:Cell',
+  'biolink:CellularComponent',
+  'biolink:MolecularActivity',
+  'biolink:GrossAnatomicalStructure',
 ];
 
 export const COMMON_PHENOTYPES = [
