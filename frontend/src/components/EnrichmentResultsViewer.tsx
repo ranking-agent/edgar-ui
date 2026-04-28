@@ -121,7 +121,7 @@ export const EnrichmentResultsViewer: React.FC<EnrichmentResultsViewerProps> = (
       <div className="p-6 space-y-6">
         {/* Header with type indicator */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm text-amber-800">
-          <span className="font-semibold">Enrichment Analysis Results</span> — Set-based enrichment with {memberIds.length} input {pluralize(inputCategory.toLowerCase(), memberIds.length)}
+          <span className="font-semibold">Enrichment Analysis Results</span> — with {memberIds.length} input {pluralize(inputCategory.toLowerCase(), memberIds.length)}
         </div>
 
         {/* Stats Grid */}
