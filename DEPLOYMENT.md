@@ -26,6 +26,8 @@ This is a tactical cap. The planned fix is a Redis-backed job store; after that,
 | Var | Default | Notes |
 |---|---|---|
 | `SECRET_KEY` | `"change-this-in-production"` | JWT signing key — **must** be set in prod |
+| `AC_BASE_URL` | `"https://answercoalesce.renci.org"` | AnswerCoalesce base URL |
+| `EDGAR_BASE_URL` | `"https://edgar.apps.renci.org"` | EDGAR's own public URL (used as callback URL for AC async queries) |
 | `MAX_WAIT_SECONDS` | `3600` (60 min) | Hard cap on how long we'll poll AnswerCoalesce before force-failing the job |
 | `POLL_INTERVAL_SECONDS` | `3` | How often we poll AC for status |
 
@@ -40,10 +42,10 @@ Two-stage build — `node:18-alpine` builds the Vite bundle, `nginx:alpine` serv
 
 The runtime `API_BASE_URL` is derived from `window.location` (see [frontend/src/utils/api.ts](frontend/src/utils/api.ts)) — same origin in production, `http://localhost:8000` in dev. The build output is therefore environment-agnostic.
 
-## Current Production (test cluster)
+## Current Production
 
-- Hostname: `edgar-test.apps.renci.org`
-- Upstream dependency: `answercoalesce-test.apps.renci.org` — pipeline latency is dominated by AC, not EDGAR.
+- Hostname: `edgar.apps.renci.org`
+- Upstream dependency: `answercoalesce.renci.org` — pipeline latency is dominated by AC, not EDGAR.
 
 ## Known Deployment Caveats
 

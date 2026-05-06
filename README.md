@@ -49,12 +49,12 @@ A web application for biomedical link prediction using enrichment analysis over 
 
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square) ![Frontend](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-61DAFB?style=flat-square)
 
-**Live instance:** [edgar-test.apps.renci.org](https://edgar-test.apps.renci.org)
+**Live instance:** [edgar.apps.renci.org](https://edgar.apps.renci.org)
 
 
 ## Architecture
 
-EDGAR submits TRAPI queries to [AnswerCoalesce](https://answercoalesce-test.apps.renci.org) (AC) via its `/asyncquery` endpoint with a callback URL, and surfaces the results through a React UI.
+EDGAR submits TRAPI queries to [AnswerCoalesce](https://answercoalesce.renci.org/docs) (AC) via its `/asyncquery` endpoint with a callback URL, and surfaces the results through a React UI.
 
 - **Backend** — FastAPI (async) that submits queries to AC's `/asyncquery` with a callback URL. AC processes in the background and POSTs the full TRAPI result back when done. Falls back to polling if the callback approach is unavailable. See [backend/README.md](backend/README.md).
 - **Frontend** — React + TypeScript + Vite with real-time job status updates via WebSocket. See [frontend/README.md](frontend/README.md).

@@ -1,6 +1,6 @@
 # EDGAR Backend
 
-FastAPI service that proxies TRAPI queries to [AnswerCoalesce](https://answercoalesce-test.apps.renci.org) and tracks job status for the EDGAR UI.
+FastAPI service that proxies TRAPI queries to [AnswerCoalesce](https://answercoalesce.renci.org/docs) and tracks job status for the EDGAR UI.
 
 ## Tech Stack
 

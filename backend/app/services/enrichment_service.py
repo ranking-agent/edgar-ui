@@ -7,12 +7,12 @@ import httpx
 from app.models.enrichment import *
 
 # AnswerCoalesce endpoints
-AC_BASE_URL = os.environ.get("AC_BASE_URL", "https://answercoalesce-test.apps.renci.org")
+AC_BASE_URL = os.environ.get("AC_BASE_URL", "https://answercoalesce.renci.org")
 AC_ASYNCQUERY = f"{AC_BASE_URL}/asyncquery"
 AC_QUERY_STATUS = f"{AC_BASE_URL}/query/status"
 
 # EDGAR's own base URL for callbacks (AC will POST results here)
-EDGAR_BASE_URL = os.environ.get("EDGAR_BASE_URL", "https://edgar-test.apps.renci.org")
+EDGAR_BASE_URL = os.environ.get("EDGAR_BASE_URL", "https://edgar.apps.renci.org")
 EDGAR_CALLBACK_PATH = "/api/v1/enrichment/callback"
 
 # Fallback polling (used when callback fails or AC doesn't support /asyncquery)
@@ -120,8 +120,10 @@ class EnrichmentService:
             job.progress = 20
             job.message = "Query submitted — waiting for AnswerCoalesce callback..."
 
-            # Wait for callback to deliver the result (with timeout)
+            # Wait for callback, but also poll AC status as a fallback
+            # in case the callback fails (e.g. SSL issues, network errors).
             elapsed = 0
+            poll_check_interval = 15
             while elapsed < MAX_WAIT_SECONDS:
                 if job.status == JobStatus.COMPLETED or job.status == JobStatus.FAILED:
                     return
@@ -129,6 +131,27 @@ class EnrichmentService:
                 elapsed += POLL_INTERVAL_SECONDS
                 job.progress = min(20 + int((elapsed / MAX_WAIT_SECONDS) * 70), 89)
                 job.message = f"Processing query... ({_format_elapsed(elapsed)} elapsed)"
+
+                if elapsed % poll_check_interval == 0 and elapsed >= poll_check_interval:
+                    try:
+                        async with httpx.AsyncClient(timeout=10.0) as poll_client:
+                            status_resp = await poll_client.get(
+                                f"{AC_QUERY_STATUS}/{job.ac_job_id}"
+                            )
+                            if status_resp.status_code == 200:
+                                status_data = status_resp.json()
+                                ac_status = status_data.get("status", "unknown")
+                                if ac_status == "completed":
+                                    await self._try_fetch_result(job)
+                                    if job.status == JobStatus.COMPLETED:
+                                        return
+                                elif ac_status == "failed":
+                                    job.status = JobStatus.FAILED
+                                    job.message = f"AnswerCoalesce failed: {status_data.get('error', 'Unknown')}"
+                                    job.progress = 100
+                                    return
+                    except Exception:
+                        pass
 
             # Timeout — callback never arrived, try fetching directly
             if job.status == JobStatus.RUNNING:

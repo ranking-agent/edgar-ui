@@ -17,6 +17,10 @@ backend:
     port: 8000
     targetPort: 8000
 
+  env:
+    AC_BASE_URL: "https://answercoalesce.renci.org"
+    EDGAR_BASE_URL: "https://edgar.apps.renci.org"
+
   resources:
     requests:
       memory: "512Mi"
@@ -57,7 +61,7 @@ ingress:
     kubernetes.io/proxy-body-size: 512m
 
   hosts:
-    - host: edgar-test.apps.renci.org
+    - host: edgar.apps.renci.org
       paths:
         - path: /api
           pathType: Prefix
@@ -73,8 +77,8 @@ ingress:
               port: 3000
   tls:
     - hosts:
-        - edgar-test.apps.renci.org
-      secretName: edgar-test.apps.renci.org-tls
+        - edgar.apps.renci.org
+      secretName: edgar.apps.renci.org-tls
 
 imagePullSecrets: []
 autoscaling:

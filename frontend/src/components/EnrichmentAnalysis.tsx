@@ -650,7 +650,7 @@ export const EnrichmentAnalysis: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Info className="w-4 h-4 text-purple-500" />
                     <span className="text-sm text-purple-700">
-                      Target: <a href={AC_URL} target="_blank" rel="noopener noreferrer" className="font-mono text-purple-600 text-xs underline hover:text-purple-800 transition-colors">{AC_URL}</a>
+                      Target: <a href="https://answercoalesce.renci.org/docs" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-600 text-xs underline hover:text-purple-800 transition-colors">{AC_URL}</a>
                     </span>
                   </div>
                 </div>

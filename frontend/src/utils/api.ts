@@ -2,7 +2,7 @@ import axios from 'axios';
 
 
 const getApiBaseUrl = () => {
-  // In production (edgar-test.apps.renci.org), use same domain
+  // In production (edgar.apps.renci.org), use same domain
   if (window.location.hostname !== 'localhost') {
     return `${window.location.protocol}//${window.location.host}/api/v1`;
   }
@@ -101,7 +101,7 @@ export const createJobWebSocket = (jobId: string, onMessage: (data: any) => void
   return ws;
 };
 
-export const AC_URL = 'https://answercoalesce-test.apps.renci.org/query';
+export const AC_URL = 'https://answercoalesce.renci.org/query';
 
 export const PREDICATES = ['biolink:treats', 'biolink:affects', 'biolink:regulates',
 'biolink:associated_with', 'biolink:active_in', 'biolink:actively_involved_in',

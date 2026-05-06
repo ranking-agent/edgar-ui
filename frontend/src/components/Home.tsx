@@ -395,7 +395,9 @@ export const Home: React.FC = () => {
                 <Database className="w-4 h-4 text-white" />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold">EDGAR</span>
+                <a href="https://ieeexplore.ieee.org/document/10825589" target='_blank'> 
+                  <span className="text-sm font-bold">EDGAR</span>
+                </a>
                 <span className="text-xs text-slate-500">v2.0.0</span>
               </div>
             </div>
