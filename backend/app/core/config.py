@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-this-in-production")
-    CORS_ORIGINS: List[str] = ["https://edgar-test.apps.renci.org", "http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["https://edgar.apps.renci.org", "http://localhost:3000", "http://localhost:5173"]
     NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
     NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "password")
