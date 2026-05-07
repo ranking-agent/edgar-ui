@@ -2,10 +2,10 @@
 
 This repo ships two container images built from the root:
 
-- `Dockerfile.backend` → `edgar-backend` (FastAPI on port 8000)
-- `Dockerfile.frontend` → `edgar-frontend` (nginx serving the built React app on port 3000)
+- `Dockerfile.backend` → `edgar-ui-backend` (FastAPI on port 8000)
+- `Dockerfile.frontend` → `edgar-ui-frontend` (nginx serving the built React app on port 3000)
 
-Both are built and pushed on every push to `main` by [.github/workflows/release.yml](.github/workflows/release.yml) to `ghcr.io/<owner>/edgar-backend` and `.../edgar-frontend`, tagged with the git tag (on release) or `latest` (on branch push).
+Both are built and pushed on every push to `main` by [.github/workflows/release.yml](.github/workflows/release.yml) to `ghcr.io/<owner>/edgar-ui-backend` and `.../edgar-ui-frontend`, tagged with the git tag (on release) or `latest` (on branch push).
 
 ## Backend Image
 
@@ -64,18 +64,18 @@ The runtime `API_BASE_URL` is derived from `window.location` (see [frontend/src/
 ## Running Images Locally
 
 ```bash
-docker build -f Dockerfile.backend -t edgar-backend:local .
-docker build -f Dockerfile.frontend -t edgar-frontend:local .
+docker build -f Dockerfile.backend -t edgar-ui-backend:local .
+docker build -f Dockerfile.frontend -t edgar-ui-frontend:local .
 
-docker run --rm -p 8000:8000 -e SECRET_KEY=dev edgar-backend:local
-docker run --rm -p 3000:3000 edgar-frontend:local
+docker run --rm -p 8000:8000 -e SECRET_KEY=dev edgar-ui-backend:local
+docker run --rm -p 3000:3000 edgar-ui-frontend:local
 ```
 
 With both running, the frontend at http://localhost:3000 will try to reach `/api/v1` on its own origin — so for end-to-end local testing you'll need a reverse proxy (or just run backend + frontend directly as in the root README's Quick Start).
 
 ## Cluster Deployment
 
-The Kubernetes manifests live in [helm/edgar1](helm/edgar1/). Chart layout:
+The Kubernetes manifests live in [helm/edgar-ui](helm/edgar-ui/). Chart layout:
 
 - `templates/backend-deployment.yaml`, `backend-service.yaml`
 - `templates/frontend-deployment.yaml`, `frontend-service.yaml`
@@ -94,7 +94,7 @@ kubectl config current-context
 kubectl create namespace <your-namespace>
 
 # 3. install the chart
-helm install edgar ./helm/edgar1 -n <your-namespace>
+helm install edgar-ui ./helm/edgar-ui -n <your-namespace>
 
 # 4. verify everything is up
 kubectl get pods,svc,ingress -n <your-namespace>
@@ -107,7 +107,7 @@ Once pods are `Running` and the ingress has an address, the app is reachable at 
 When you change `values.yaml` or a template:
 
 ```bash
-helm upgrade edgar ./helm/edgar1 -n <your-namespace>
+helm upgrade edgar-ui ./helm/edgar-ui -n <your-namespace>
 ```
 
 ### Redeploying after a new image build
@@ -115,6 +115,6 @@ helm upgrade edgar ./helm/edgar1 -n <your-namespace>
 After `main` is updated and the release workflow finishes pushing new `latest` images, roll the pods to pick them up:
 
 ```bash
-kubectl rollout restart deployment edgar-backend  -n <your-namespace>
-kubectl rollout restart deployment edgar-frontend -n <your-namespace>
+kubectl rollout restart deployment edgar-ui-backend  -n <your-namespace>
+kubectl rollout restart deployment edgar-ui-frontend -n <your-namespace>
 ```

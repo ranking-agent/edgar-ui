@@ -46,8 +46,8 @@ jobs:
                   file: ./Dockerfile.backend
                   push: true
                   tags: |
-                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-backend:${{ steps.get_version.outputs.VERSION }}
-                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-backend:latest
+                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-ui-backend:${{ steps.get_version.outputs.VERSION }}
+                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-ui-backend:latest
                   platforms: linux/amd64
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
@@ -59,8 +59,8 @@ jobs:
                   file: ./Dockerfile.frontend
                   push: true
                   tags: |
-                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-frontend:${{ steps.get_version.outputs.VERSION }}
-                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-frontend:latest
+                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-ui-frontend:${{ steps.get_version.outputs.VERSION }}
+                    ${{ env.REGISTRY }}/${{ github.repository_owner }}/edgar-ui-frontend:latest
                   platforms: linux/amd64
                   cache-from: type=gha
                   cache-to: type=gha,mode=max

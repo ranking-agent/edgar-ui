@@ -98,8 +98,8 @@ Open http://localhost:5173 and log in with `demo` / `demo` (dev-only credentials
 After merging to `main`, the release workflow pushes new container images. To roll the pods in the cluster:
 
 ```bash
-kubectl rollout restart deployment edgar-backend  -n <your-namespace>
-kubectl rollout restart deployment edgar-frontend -n <your-namespace>
+kubectl rollout restart deployment edgar-ui-backend  -n <your-namespace>
+kubectl rollout restart deployment edgar-ui-frontend -n <your-namespace>
 ```
 
 First-time install (helm chart, namespace, ingress) is covered in [DEPLOYMENT.md](DEPLOYMENT.md#cluster-deployment).

@@ -1,5 +1,5 @@
 apiVersion: v2
-name: edgar1
+name: edgar-ui
 description: EDGAR - Enrichment-Driven GrAph Reasoner
 type: application
 version: 1.0.0
