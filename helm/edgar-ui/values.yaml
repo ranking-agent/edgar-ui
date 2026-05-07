@@ -8,7 +8,7 @@ backend:
   name: edgar-ui-backend
   replicaCount: 1
   image:
-    repository: ghcr.io/wumirose/edgar-ui-backend
+    repository: ghcr.io/ranking-agent/edgar-ui-backend
     tag: latest
     pullPolicy: Always
 
@@ -34,7 +34,7 @@ frontend:
   name: edgar-ui-frontend
   replicaCount: 1
   image:
-    repository: ghcr.io/wumirose/edgar-ui-frontend
+    repository: ghcr.io/ranking-agent/edgar-ui-frontend
     tag: latest
     pullPolicy: Always
 
