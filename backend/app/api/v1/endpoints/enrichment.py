@@ -52,6 +52,7 @@ async def create_enrichment_analysis(
             job_id=job.id,
             status=JobStatus.QUEUED,
             message="Analysis queued - query will be sent to AnswerCoalesce",
+            query_summary=job.query_summary,
             ws_url=f"/ws/job/{job.id}",
             created_at=job.created_at
         )
@@ -95,10 +96,11 @@ async def get_job_status(
             status=job.status,
             progress=job.progress,
             message=job.message,
+            query_summary=job.query_summary,
             created_at=job.created_at,
             completed_at=job.completed_at
         )
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -183,6 +185,7 @@ async def get_job_history(
             status=job.status,
             progress=job.progress,
             message=job.message,
+            query_summary=job.query_summary,
             created_at=job.created_at,
             completed_at=job.completed_at
         )

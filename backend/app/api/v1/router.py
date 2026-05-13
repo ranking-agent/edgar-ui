@@ -1,8 +1,9 @@
 """API v1 Router"""
 from fastapi import APIRouter
-from app.api.v1.endpoints import enrichment, query, auth
+from app.api.v1.endpoints import enrichment, query, auth, biolink
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(enrichment.router, prefix="/enrichment", tags=["enrichment"])
 api_router.include_router(query.router, prefix="/query", tags=["query"])
+api_router.include_router(biolink.router, prefix="/biolink", tags=["biolink"])

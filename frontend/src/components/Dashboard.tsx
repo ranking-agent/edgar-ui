@@ -11,14 +11,25 @@ import {
 import { QueryBuilder } from './QueryBuilder';
 import { JobStatus } from './JobStatus';
 import { ResultsViewer } from './ResultsViewer';
+import { RetrySuggestion } from './PipelineInsights';
 import { AC_URL } from '../utils/api';
 
 
-interface DashboardProps {
-  initialJobId?: string | null;
+interface QueryTemplate {
+  value: string;
+  example: string;
+  exampleLabel: string;
+  exampleIsTarget: boolean;
+  params?: { pvalueThreshold?: string; ruleLength?: string };
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
+interface DashboardProps {
+  initialJobId?: string | null;
+  initialTemplate?: QueryTemplate | null;
+  onTemplateClear?: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ initialJobId, initialTemplate, onTemplateClear }) => {
   const [previewQuery, setPreviewQuery] = useState<any>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(initialJobId ?? null);
@@ -34,11 +45,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
       setQueryBuilderExpanded(false);
     }
   }, [initialJobId]);
+
+  useEffect(() => {
+    if (initialTemplate) {
+      setCompletedJobId(null);
+      setCurrentJobId(null);
+      setResultsData(null);
+      setSelectedRuleKey(null);
+      setFilteredResultIndices([]);
+      setQueryBuilderExpanded(true);
+    }
+  }, [initialTemplate]);
   const [resultsData, setResultsData] = useState<any>(null);
   const [selectedRuleKey, setSelectedRuleKey] = useState<string | null>(null);
   const [filteredResultIndices, setFilteredResultIndices] = useState<number[]>([]);
   const [queryBuilderExpanded, setQueryBuilderExpanded] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [trapiPreviewExpanded, setTrapiPreviewExpanded] = useState(false);
+  const [retryTweaks, setRetryTweaks] = useState<RetrySuggestion['tweaks'] | null>(null);
+
+  const handleRetry = (suggestion: RetrySuggestion) => {
+    setRetryTweaks(suggestion.tweaks);
+    setCompletedJobId(null);
+    setCurrentJobId(null);
+    setResultsData(null);
+    setSelectedRuleKey(null);
+    setFilteredResultIndices([]);
+    setQueryBuilderExpanded(true);
+  };
 
   const handleJobCreated = (jobId: string) => {
     setCurrentJobId(jobId);
@@ -127,56 +161,75 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
               </button>
             </div>
           )}
-        <div className="grid gap-6 lg:grid-cols-5">
-          {/* Left Column - Query Builder (wider: 3/5) */}
-          <div className="lg:col-span-3 space-y-4">
-            {/* Query Builder Card */}
-            <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50/50 border-b border-purple-100/60">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Query Builder</h3>
-                    <p className="text-sm text-slate-500">Define your biomedical query</p>
-                  </div>
+        {/* Centered Query Builder */}
+        <div className="max-w-5xl mx-auto space-y-4">
+          {/* Query Builder Card */}
+          <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50/50 border-b border-purple-100/60">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Query Builder</h3>
+                  <p className="text-sm text-slate-500">Define your biomedical query</p>
                 </div>
-                {resultsData && (
-                  <button
-                    onClick={() => setQueryBuilderExpanded(false)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
-                  >
-                    <ChevronUp className="w-4 h-4 -rotate-90" />
-                    Collapse
-                  </button>
-                )}
               </div>
-              
-              <div className="p-6">
-                <QueryBuilder 
-                  onJobCreated={handleJobCreated} 
-                  onQueryPreview={setPreviewQuery}
-                />
-              </div>
+              {resultsData && (
+                <button
+                  onClick={() => setQueryBuilderExpanded(false)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
+                >
+                  <ChevronUp className="w-4 h-4 -rotate-90" />
+                  Collapse
+                </button>
+              )}
             </div>
-            
-            {/* Job Status */}
-            {currentJobId && (
-              <div ref={jobStatusRef}>
-                <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
-              </div>
-            )}
+
+            <div className="p-6">
+              <QueryBuilder
+                onJobCreated={handleJobCreated}
+                onQueryPreview={setPreviewQuery}
+                initialTemplate={initialTemplate}
+                onTemplateClear={onTemplateClear}
+                retryTweaks={retryTweaks}
+                onRetryApplied={() => setRetryTweaks(null)}
+              />
+            </div>
           </div>
 
-          {/* Right Column - TRAPI Preview (narrower: 2/5) */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-xl shadow-purple-100/50 border border-purple-100/60 overflow-hidden sticky top-32">
-              <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700/50">
+          {/* Job Status */}
+          {currentJobId && (
+            <div ref={jobStatusRef}>
+              <JobStatus jobId={currentJobId} onComplete={handleJobComplete} />
+            </div>
+          )}
+        </div>
+
+        {/* TRAPI Preview — vertical tab on the right edge */}
+        {!trapiPreviewExpanded ? (
+          <button
+            onClick={() => setTrapiPreviewExpanded(true)}
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-2 py-4 px-2 bg-slate-800 border border-r-0 border-slate-700 rounded-l-xl shadow-lg hover:shadow-xl hover:bg-slate-700 transition-all duration-200 text-slate-300 hover:text-white font-medium text-sm"
+            aria-label="Show TRAPI Preview"
+          >
+            <Code2 className="w-4 h-4 text-purple-400" />
+            <span className="[writing-mode:vertical-rl] tracking-wide">
+              TRAPI Preview
+            </span>
+          </button>
+        ) : (
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm"
+              onClick={() => setTrapiPreviewExpanded(false)}
+            />
+            <div className="fixed top-0 right-0 z-50 h-full w-[480px] max-w-[90vw] bg-slate-900 shadow-2xl flex flex-col animate-slide-in-right" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center">
-                    <Code2 className="w-5 h-5 text-purple-400" />
+                  <div className="w-9 h-9 bg-slate-700 rounded-lg flex items-center justify-center">
+                    <Code2 className="w-4 h-4 text-purple-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">TRAPI Query Preview</h3>
-                    <p className="text-sm text-slate-400">Live preview of your query</p>
+                    <h3 className="text-base font-semibold text-white">TRAPI Query Preview</h3>
+                    <p className="text-xs text-slate-400">Live preview of your query</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -189,54 +242,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialJobId }) => {
                     }`}
                     title="Copy TRAPI query to clipboard"
                   >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                      </>
-                    )}
+                    {copied ? <><Check className="w-4 h-4" />Copied!</> : <Copy className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => setTrapiPreviewExpanded(false)}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-              
-              <div className="bg-slate-900">
-                <div className="p-4 overflow-x-auto max-h-[600px] custom-scrollbar">
-                  <pre 
-                    className="text-sm leading-relaxed"
-                    style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
-                  >
-                    <code>
-                      {formatJsonWithSyntaxHighlighting(previewQuery || {})}
-                    </code>
-                  </pre>
-                </div>
+
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <pre
+                  className="text-sm leading-relaxed"
+                  style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
+                >
+                  <code>
+                    {formatJsonWithSyntaxHighlighting(previewQuery || {})}
+                  </code>
+                </pre>
               </div>
-              
-              <div className="px-6 py-4 bg-purple-50 border-t border-purple-100">
+
+              <div className="px-5 py-3 bg-purple-900/30 border-t border-slate-700/50">
                 <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm text-purple-700">
-                    Target: <a href="https://answercoalesce.renci.org/docs" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-600 text-xs underline hover:text-purple-800 transition-colors">{AC_URL}</a>
+                  <Info className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm text-purple-300">
+                    Target: <a href="https://answercoalesce.renci.org/docs" target="_blank" rel="noopener noreferrer" className="font-mono text-purple-400 text-xs underline hover:text-purple-200 transition-colors">{AC_URL}</a>
                   </span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
         </div>
       )}
 
       {/* Results View - Full width when showing results */}
       {completedJobId && (
-        <ResultsViewer 
-          jobId={completedJobId} 
+        <ResultsViewer
+          jobId={completedJobId}
           onResultsLoad={handleResultsLoad}
           onTabChange={() => {}}
           onRuleSelect={handleRuleSelect}
+          onRetry={handleRetry}
         />
       )}
     </div>

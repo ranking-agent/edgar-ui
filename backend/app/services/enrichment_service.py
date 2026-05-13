@@ -30,11 +30,37 @@ def _format_elapsed(seconds: float) -> str:
     return f"{m}m {sec}s"
 
 
+def _build_query_summary(request: EnrichmentAnalysisRequest) -> str:
+    try:
+        qg = request.message.query_graph
+        edges = list(qg.edges.values())
+        if not edges:
+            return "Unknown query"
+        edge = edges[0]
+        pred = edge.predicates[0].replace("biolink:", "") if edge.predicates else "?"
+        subj_node = qg.nodes.get(edge.subject)
+        obj_node = qg.nodes.get(edge.object)
+        subj_cat = (subj_node.categories[0].replace("biolink:", "") if subj_node and subj_node.categories else "?")
+        obj_cat = (obj_node.categories[0].replace("biolink:", "") if obj_node and obj_node.categories else "?")
+        curie = ""
+        for node in qg.nodes.values():
+            if node.ids:
+                curie = node.ids[0]
+                break
+        summary = f"{subj_cat} {pred.replace('_', ' ')} {obj_cat}"
+        if curie:
+            summary += f" ({curie})"
+        return summary
+    except Exception:
+        return "Unknown query"
+
+
 class Job:
     def __init__(self, job_id: str, user_id: str, request: EnrichmentAnalysisRequest):
         self.id = job_id
         self.user_id = user_id
         self.request = request
+        self.query_summary = _build_query_summary(request)
         self.status = JobStatus.QUEUED
         self.progress = 0
         self.message = "Job queued"

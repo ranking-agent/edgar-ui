@@ -118,6 +118,7 @@ class EnrichmentAnalysisResponse(BaseModel):
     status: JobStatus
     progress: int = Field(default=0, ge=0, le=100)
     message: Optional[str] = None
+    query_summary: Optional[str] = None
     ws_url: Optional[str] = None
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

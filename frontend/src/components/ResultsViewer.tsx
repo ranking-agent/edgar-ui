@@ -3,7 +3,7 @@ import { enrichmentAPI } from '../utils/api';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { ResultPathViewer } from './ResultPathViewer';
 import { ErrorBoundary } from './ErrorBoundary';
-import { PipelineInsights } from './PipelineInsights';
+import { PipelineInsights, RetrySuggestion } from './PipelineInsights';
 
 // Node Chip Component - Expandable for multiple members
 const NodeChip: React.FC<{ 
@@ -73,6 +73,7 @@ interface ResultsViewerProps {
   onResultsLoad?: (results: any) => void;
   onTabChange?: (tab: string) => void;
   onRuleSelect?: (ruleKey: string | null, resultIndices: number[]) => void;
+  onRetry?: (suggestion: RetrySuggestion) => void;
 }
 
 interface EnrichmentRule {
@@ -88,7 +89,7 @@ interface EnrichmentRule {
   isEnrichmentSubject: boolean;
 }
 
-export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData, onResultsLoad, onTabChange, onRuleSelect }) => {
+export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData, onResultsLoad, onTabChange, onRuleSelect, onRetry }) => {
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -96,7 +97,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
   const [selectedRule, setSelectedRule] = useState<string | null>(null);
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
   const [resultViewModes, setResultViewModes] = useState<Map<number, 'paths' | 'graph'>>(new Map());
-  const [showAllResults, setShowAllResults] = useState(false);
+  const [showAllResults, setShowAllResults] = useState(true);
   const [expandedRuleMembers, setExpandedRuleMembers] = useState<string | null>(null);
   const [expandedSupportGraphs, setExpandedSupportGraphs] = useState<Map<string, boolean>>(new Map());
 
@@ -222,6 +223,48 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
     }
   });
 
+  // Build query context for retry suggestions
+  const queryContext = (() => {
+    let sourceCategory = '';
+    let targetCategory = '';
+    let predicate = '';
+    let entityId = '';
+    let entityName = '';
+    let entityIsTarget = false;
+    let pvalueThreshold = '';
+    let ruleLength = '';
+
+    Object.values(queryGraph.edges || {}).forEach((edge: any) => {
+      const subjectNode = queryGraph.nodes[edge.subject];
+      const objectNode = queryGraph.nodes[edge.object];
+      predicate = edge.predicates?.[0] || '';
+      sourceCategory = subjectNode?.categories?.[0] || '';
+      targetCategory = objectNode?.categories?.[0] || '';
+
+      if (subjectNode?.ids?.length) {
+        entityId = subjectNode.ids[0];
+        entityIsTarget = false;
+        const kgNode = knowledgeGraph?.nodes?.[entityId];
+        entityName = kgNode?.name || '';
+      } else if (objectNode?.ids?.length) {
+        entityId = objectNode.ids[0];
+        entityIsTarget = true;
+        const kgNode = knowledgeGraph?.nodes?.[entityId];
+        entityName = kgNode?.name || '';
+      }
+    });
+
+    const pvalParam = results.parameters?.pvalue_threshold
+      ?? results.message?.parameters?.pvalue_threshold;
+    if (pvalParam) pvalueThreshold = String(pvalParam);
+
+    const ruleParam = results.parameters?.max_rules
+      ?? results.message?.parameters?.max_rules;
+    if (ruleParam) ruleLength = String(ruleParam);
+
+    return { sourceCategory, targetCategory, predicate, entityId, entityName, entityIsTarget, pvalueThreshold, ruleLength };
+  })();
+
   // Extract lookup set members (Direct results)
   const lookupSetMembers = new Map<string, any>();
 
@@ -321,20 +364,10 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
           const edge = knowledgeGraph.edges?.[auxEdgeId];
           if (!edge) return;
 
-          // ENRICHMENT EDGE DETECTION (non-hardcoded, direction-agnostic):
-          // An enrichment edge has ALL of these properties:
-          // 1. Edge ID starts with 'e_' (enrichment edge marker)
-          // 2. Edge ID does NOT contain 'member_of' (not a membership edge)
-          // 3. Either subject OR object is 'uuid:*' (points to lookup set)
-          // 4. Has support_graphs attribute with ARRAY value (has member evidence)
-          
           const hasUuid = edge.subject?.startsWith('uuid:') || edge.object?.startsWith('uuid:');
-          const isEnrichmentEdge =
-            (auxEdgeId.startsWith('e_') || auxEdgeId.startsWith('n_')) &&
-            !auxEdgeId.includes('member_of') &&
-            hasUuid;
-          
-          if (!isEnrichmentEdge) return;
+
+
+          if (!hasUuid || edge.predicate === 'biolink:member_of') return;
 
           const supportGraphsAttr = edge.attributes?.find(
             (attr: any) => attr.attribute_type_id === 'biolink:support_graphs'
@@ -368,9 +401,12 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
                 (attr: any) => attr.attribute_type_id === 'biolink:p_value'
               );
 
-              if (pValueAttr?.value && typeof pValueAttr.value === 'number') {
-                currentPValue = pValueAttr.value;
-                currentMemberId = nestedEdge.object;
+              if (pValueAttr?.value != null) {
+                const pVal = typeof pValueAttr.value === 'number' ? pValueAttr.value : parseFloat(pValueAttr.value);
+                if (!isNaN(pVal)) {
+                  currentPValue = pVal;
+                  currentMemberId = nestedEdge.object;
+                }
               }
 
               if (nestedEdge.predicate === 'biolink:member_of') {
@@ -569,8 +605,8 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
         const pValueAttr = nestedEdge.attributes?.find(
           (attr: any) => attr.attribute_type_id === 'biolink:p_value'
         );
-        if (pValueAttr?.value) {
-          pValue = pValueAttr.value;
+        if (pValueAttr?.value != null) {
+          pValue = typeof pValueAttr.value === 'number' ? pValueAttr.value : parseFloat(pValueAttr.value);
         }
 
         if (nestedEdge.predicate === 'biolink:member_of') {
@@ -689,15 +725,15 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
           <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3">
             <div className="flex items-center text-xs text-green-700 font-semibold mb-2">
               Connected {memberTypeLabel} ({connectedMembers.length})
-              {connectedMembers?.[0]?.pValue !== undefined && (
-                <span className="inline-flex ml-auto"> : p = {connectedMembers[0].pValue.toExponential(2)}</span>
+              {connectedMembers.length > 0 && (
+                <span className="inline-flex ml-auto">p = {Math.min(...connectedMembers.map(m => m.pValue)).toExponential(2)}</span>
               )}
             </div>
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {connectedMembers
                 .sort((a, b) => a.pValue - b.pValue)
                 .map((member, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-white border border-green-200 rounded p-2">
+                  <div key={idx} className="flex items-center bg-white border border-green-200 rounded p-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-xs font-semibold text-gray-900 truncate">
@@ -710,9 +746,6 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
                       <div className="text-xs text-gray-500 font-mono truncate">
                         {member.id}
                       </div>
-                    </div>
-                    <div className="ml-2 text-xs font-mono text-green-700 font-semibold">
-                      p={member.pValue.toExponential(2)}
                     </div>
                   </div>
                 ))}
@@ -839,9 +872,11 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
                       (attr: any) => attr.attribute_type_id === 'biolink:support_graphs'
                     ) || [];
                     
-                    const supportGraphs = supportGraphAttrs.flatMap((attr: any) =>
-                      Array.isArray(attr.value) ? attr.value : [attr.value]
-                    ).filter(Boolean);
+                    const supportGraphs: string[] = [...new Set<string>(
+                      supportGraphAttrs.flatMap((attr: any) =>
+                        Array.isArray(attr.value) ? attr.value : [attr.value]
+                      ).filter(Boolean)
+                    )];
 
                     return (
                       <div className="space-y-4">
@@ -893,7 +928,7 @@ export const ResultsViewer: React.FC<ResultsViewerProps> = ({ jobId, directData,
     <div className="bg-white rounded-xl shadow-lg">
       <div className="p-6 space-y-6">
         {/* Pipeline Insights - shows when results are limited */}
-        <PipelineInsights logs={logs} totalResults={totalResults} />
+        <PipelineInsights logs={logs} totalResults={totalResults} queryContext={queryContext} onRetry={onRetry} />
         {/* Stats - Clickable cards replace tabs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           

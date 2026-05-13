@@ -12,6 +12,14 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+const getBrowserId = (): string => {
+  let id = localStorage.getItem('edgar_browser_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('edgar_browser_id', id);
+  }
+  return id;
+};
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,12 +28,13 @@ export const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// Add auth token and browser ID to requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.headers['X-Browser-ID'] = getBrowserId();
   return config;
 });
 
@@ -77,7 +86,15 @@ export const enrichmentAPI = {
     const response = await api.post(`/enrichment/notifications/${jobId}/seen`);
     return response.data;
   },
-  
+
+};
+
+// Biolink API
+export const biolinkAPI = {
+  getAssociations: async (): Promise<Record<string, string[]>> => {
+    const response = await api.get('/biolink/associations');
+    return response.data;
+  },
 };
 
 // WebSocket connection for job updates

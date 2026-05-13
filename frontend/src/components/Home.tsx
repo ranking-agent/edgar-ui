@@ -22,6 +22,8 @@ export const Home: React.FC = () => {
   };
   const handleViewResults = (jobId: string) => {
     setViewJobId(jobId);
+    setSelectedTemplate(null);
+    setDashboardKey(k => k + 1);
     setCurrentPage('dashboard');
   };
 
@@ -35,30 +37,59 @@ export const Home: React.FC = () => {
     { id: 'history' as Page, label: 'Job History', icon: History },
   ];
 
+  const [selectedTemplate, setSelectedTemplate] = React.useState<any>(null);
+  const [dashboardKey, setDashboardKey] = React.useState(0);
+
   const useCases = [
-    { 
-      icon: Pill, 
-      title: 'Drug Repurposing', 
+    {
+      icon: Pill,
+      title: 'Drug Repurposing',
       description: 'Discover potential new therapeutic uses for existing drugs',
-      color: 'from-violet-500 to-purple-600'
+      color: 'from-violet-500 to-purple-600',
+      template: {
+        value: 'biolink:Drug-biolink:treats-biolink:Disease',
+        example: 'MONDO:0004975',
+        exampleLabel: 'Alzheimer disease',
+        exampleIsTarget: true,
+      },
     },
-    { 
-      icon: Dna, 
-      title: 'Gene Discovery', 
+    {
+      icon: Dna,
+      title: 'Gene Discovery',
       description: 'Identify genes associated with specific diseases',
-      color: 'from-fuchsia-500 to-pink-600'
+      color: 'from-fuchsia-500 to-pink-600',
+      template: {
+        value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
+        example: 'DOID:0050430',
+        exampleLabel: 'multiple endocrine neoplasia type 2A',
+        exampleIsTarget: true,
+        params: { pvalueThreshold: '1e-10' },
+      },
     },
-    { 
-      icon: Activity, 
-      title: 'Function Prediction', 
+    {
+      icon: Activity,
+      title: 'Function Prediction',
       description: 'Predict biological processes for genes of interest',
-      color: 'from-indigo-500 to-blue-600'
+      color: 'from-indigo-500 to-blue-600',
+      template: {
+        value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
+        example: 'NCBIGene:122481',
+        exampleLabel: 'NCBIGene:122481',
+        exampleIsTarget: false,
+      },
     },
-    { 
-      icon: FlaskConical, 
-      title: 'Pathway Analysis', 
+    {
+      icon: FlaskConical,
+      title: 'Pathway Analysis',
       description: 'Explore biochemical pathways involving specific genes',
-      color: 'from-purple-500 to-indigo-600'
+      color: 'from-purple-500 to-indigo-600',
+      template: {
+        value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
+        example: 'HP:0003637',
+        exampleLabel: 'Myasthenia',
+        exampleIsTarget: true,
+        params: { pvalueThreshold: '1e-3', ruleLength: '300' },
+      },
     },
   ];
 
@@ -274,7 +305,12 @@ export const Home: React.FC = () => {
                   
                   <div className="flex flex-wrap gap-4">
                     <button
-                      onClick={() => setCurrentPage('dashboard')}
+                      onClick={() => {
+                        setViewJobId(null);
+                        setSelectedTemplate(null);
+                        setDashboardKey(k => k + 1);
+                        setCurrentPage('dashboard');
+                      }}
                       className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 transition-all duration-300 hover:-translate-y-0.5"
                     >
                       Start Analysis
@@ -282,10 +318,11 @@ export const Home: React.FC = () => {
                     </button>
                     
                     <button
-                      onClick={() => setCurrentPage('enrichment')}
+                      onClick={() => window.open('https://robokop.renci.org/explore/enrichment-analysis', '_blank')}
                       className="flex items-center gap-2 px-6 py-3 bg-purple-50 text-purple-700 rounded-xl font-semibold hover:bg-purple-100 transition-all duration-200 border border-purple-200"
                     >
                       Enrichment Analysis
+                      <ExternalLink className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -297,10 +334,13 @@ export const Home: React.FC = () => {
               {useCases.map((useCase, idx) => {
                 const Icon = useCase.icon;
                 return (
-                  <div 
+                  <div
                     key={idx}
                     className="group relative bg-white rounded-xl p-6 border border-purple-100/60 shadow-sm hover:shadow-lg hover:shadow-purple-100/50 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                    onClick={() => setCurrentPage('dashboard')}
+                    onClick={() => {
+                      setSelectedTemplate(useCase.template);
+                      setCurrentPage('dashboard');
+                    }}
                   >
                     {/* Gradient accent line */}
                     <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${useCase.color} rounded-t-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
@@ -363,7 +403,7 @@ export const Home: React.FC = () => {
         )}
 
         <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
-          <Dashboard initialJobId={viewJobId} />
+          <Dashboard key={dashboardKey} initialJobId={viewJobId} initialTemplate={selectedTemplate} onTemplateClear={() => setSelectedTemplate(null)} />
         </div>
         <div style={{ display: currentPage === 'normalize' ? 'block' : 'none' }}>
           <NormalizeNode />
@@ -377,6 +417,8 @@ export const Home: React.FC = () => {
         {currentPage === 'history' && (
           <JobHistory onSelectJob={(jobId) => {
             setViewJobId(jobId);
+            setSelectedTemplate(null);
+            setDashboardKey(k => k + 1);
             setCurrentPage('dashboard');
           }} />
         )}

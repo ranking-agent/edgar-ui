@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Search, 
-  Info, 
+  Info,
   Settings2, 
   ChevronDown, 
   ChevronUp, 
   Play,
-  Lightbulb,
+
   Loader2,
   AlertCircle,
   X,
   Plus,
 } from 'lucide-react';
-import { enrichmentAPI, PREDICATES, NODE_CATEGORIES, ASPECT_QUALIFIERS, DIRECTION_QUALIFIERS } from '../utils/api';
+import { enrichmentAPI, biolinkAPI, PREDICATES, NODE_CATEGORIES, ASPECT_QUALIFIERS, DIRECTION_QUALIFIERS } from '../utils/api';
 
 // Qualified predicates that support aspect/direction qualifiers
 const QUALIFIED_PREDICATES = ['biolink:affects', 'biolink:regulates'];
@@ -26,49 +25,99 @@ const DIRECTION_QUALIFIERS_BY_PREDICATE: Record<string, string[]> = {
 const DEFAULT_PVALUE = '1e-5';
 const DEFAULT_MAX_RULES = '100';
 
-const EXAMPLE_QUERIES = [
-  {
-    label: 'Drugs that treat a Disease',
-    description: 'e.g., MONDO:0004975 (Alzheimer disease)',
-    value: 'biolink:Drug-biolink:treats-biolink:Disease',
-    example: 'MONDO:0004975',
-    exampleIsTarget: true,
-  },
-  {
-    label: 'Phenotypes of a Gene',
-    description: 'e.g., NCBIGene:122481',
-    value: 'biolink:Gene-biolink:has_phenotype-biolink:PhenotypicFeature',
-    example: 'NCBIGene:122481',
-    exampleIsTarget: false,
-  },
-  {
-    label: 'Phenotypes of a Disease',
-    description: 'e.g., MONDO:0005147 (Type 1 diabetes)',
-    value: 'biolink:Disease-biolink:has_phenotype-biolink:PhenotypicFeature',
-    example: 'MONDO:0005147',
-    exampleIsTarget: false,
-  },
-  {
-    label: 'Genes associated with a Disease',
-    description: 'e.g., DOID:0050430 (multiple endocrine neoplasia type 2A disease)',
-    value: 'biolink:Gene-biolink:genetically_associated_with-biolink:Disease',
-    example: 'DOID:0050430',
-    exampleIsTarget: true,
-    params: { pvalueThreshold: '1e-10'},
-  },
-  {
-    label: 'Genes affecting a Phenotype',
-    description: 'e.g., HP:0003637 (Myasthenia)',
-    value: 'biolink:Gene-biolink:affects-biolink:PhenotypicFeature',
-    example: 'HP:0003637',
-    exampleIsTarget: true,
-    params: { pvalueThreshold: '1e-3', ruleLength: '300' },
-  },
-];
+// Natural-language verb forms: plural (for category subjects) and singular (for entity subjects)
+const PREDICATE_PHRASES: Record<string, { plural: string; singular: string }> = {
+  'biolink:treats':                                      { plural: 'treat',                                       singular: 'treats' },
+  'biolink:affects':                                     { plural: 'affect',                                      singular: 'affects' },
+  'biolink:regulates':                                   { plural: 'regulate',                                    singular: 'regulates' },
+  'biolink:associated_with':                             { plural: 'are associated with',                         singular: 'is associated with' },
+  'biolink:active_in':                                   { plural: 'are active in',                               singular: 'is active in' },
+  'biolink:actively_involved_in':                        { plural: 'are actively involved in',                    singular: 'is actively involved in' },
+  'biolink:acts_upstream_of':                            { plural: 'act upstream of',                             singular: 'acts upstream of' },
+  'biolink:acts_upstream_of_negative_effect':            { plural: 'act upstream of with negative effect on',     singular: 'acts upstream of with negative effect on' },
+  'biolink:acts_upstream_of_or_within_negative_effect':  { plural: 'act upstream of or within with negative effect on',  singular: 'acts upstream of or within with negative effect on' },
+  'biolink:acts_upstream_of_or_within_positive_effect':  { plural: 'act upstream of or within with positive effect on',  singular: 'acts upstream of or within with positive effect on' },
+  'biolink:acts_upstream_of_positive_effect':            { plural: 'act upstream of with positive effect on',     singular: 'acts upstream of with positive effect on' },
+  'biolink:affects_response_to':                         { plural: 'affect response to',                          singular: 'affects response to' },
+  'biolink:ameliorates':                                 { plural: 'ameliorate',                                  singular: 'ameliorates' },
+  'biolink:binds':                                       { plural: 'bind',                                        singular: 'binds' },
+  'biolink:capable_of':                                  { plural: 'are capable of',                              singular: 'is capable of' },
+  'biolink:catalyzes':                                   { plural: 'catalyze',                                    singular: 'catalyzes' },
+  'biolink:causes':                                      { plural: 'cause',                                       singular: 'causes' },
+  'biolink:coexists_with':                               { plural: 'coexist with',                                singular: 'coexists with' },
+  'biolink:coexpressed_with':                            { plural: 'are coexpressed with',                        singular: 'is coexpressed with' },
+  'biolink:colocalizes_with':                            { plural: 'colocalize with',                             singular: 'colocalizes with' },
+  'biolink:composed_primarily_of':                       { plural: 'are composed primarily of',                   singular: 'is composed primarily of' },
+  'biolink:contraindicated_for':                         { plural: 'are contraindicated for',                     singular: 'is contraindicated for' },
+  'biolink:contributes_to':                              { plural: 'contribute to',                               singular: 'contributes to' },
+  'biolink:correlated_with':                             { plural: 'are correlated with',                         singular: 'is correlated with' },
+  'biolink:decreases_response_to':                       { plural: 'decrease response to',                        singular: 'decreases response to' },
+  'biolink:derives_from':                                { plural: 'derive from',                                 singular: 'derives from' },
+  'biolink:develops_from':                               { plural: 'develop from',                                singular: 'develops from' },
+  'biolink:directly_physically_interacts_with':          { plural: 'directly physically interact with',           singular: 'directly physically interacts with' },
+  'biolink:disease_has_basis_in':                        { plural: 'have basis in',                               singular: 'has basis in' },
+  'biolink:disrupts':                                    { plural: 'disrupt',                                     singular: 'disrupts' },
+  'biolink:expressed_in':                                { plural: 'are expressed in',                             singular: 'is expressed in' },
+  'biolink:gene_associated_with_condition':              { plural: 'are associated with',                         singular: 'is associated with' },
+  'biolink:gene_product_of':                             { plural: 'are gene products of',                        singular: 'is a gene product of' },
+  'biolink:genetically_associated_with':                 { plural: 'are genetically associated with',             singular: 'is genetically associated with' },
+  'biolink:genetically_interacts_with':                  { plural: 'genetically interact with',                   singular: 'genetically interacts with' },
+  'biolink:has_adverse_event':                           { plural: 'have adverse event',                          singular: 'has adverse event' },
+  'biolink:has_input':                                   { plural: 'have as input',                               singular: 'has as input' },
+  'biolink:has_output':                                  { plural: 'have as output',                              singular: 'has as output' },
+  'biolink:has_part':                                    { plural: 'have as part',                                singular: 'has as part' },
+  'biolink:has_participant':                             { plural: 'have as participant',                          singular: 'has as participant' },
+  'biolink:has_phenotype':                               { plural: 'exhibit',                                     singular: 'exhibits' },
+  'biolink:homologous_to':                               { plural: 'are homologous to',                           singular: 'is homologous to' },
+  'biolink:in_taxon':                                    { plural: 'are in taxon',                                singular: 'is in taxon' },
+  'biolink:increases_response_to':                       { plural: 'increase response to',                        singular: 'increases response to' },
+  'biolink:is_frameshift_variant_of':                    { plural: 'are frameshift variants of',                  singular: 'is a frameshift variant of' },
+  'biolink:is_missense_variant_of':                      { plural: 'are missense variants of',                    singular: 'is a missense variant of' },
+  'biolink:is_nearby_variant_of':                        { plural: 'are nearby variants of',                      singular: 'is a nearby variant of' },
+  'biolink:is_non_coding_variant_of':                    { plural: 'are non-coding variants of',                  singular: 'is a non-coding variant of' },
+  'biolink:is_nonsense_variant_of':                      { plural: 'are nonsense variants of',                    singular: 'is a nonsense variant of' },
+  'biolink:is_splice_site_variant_of':                   { plural: 'are splice site variants of',                 singular: 'is a splice site variant of' },
+  'biolink:is_synonymous_variant_of':                    { plural: 'are synonymous variants of',                  singular: 'is a synonymous variant of' },
+  'biolink:located_in':                                  { plural: 'are located in',                              singular: 'is located in' },
+  'biolink:negatively_correlated_with':                  { plural: 'are negatively correlated with',              singular: 'is negatively correlated with' },
+  'biolink:occurs_in':                                   { plural: 'occur in',                                    singular: 'occurs in' },
+  'biolink:overlaps':                                    { plural: 'overlap with',                                singular: 'overlaps with' },
+  'biolink:physically_interacts_with':                   { plural: 'physically interact with',                    singular: 'physically interacts with' },
+  'biolink:positively_correlated_with':                  { plural: 'are positively correlated with',              singular: 'is positively correlated with' },
+  'biolink:precedes':                                    { plural: 'precede',                                     singular: 'precedes' },
+  'biolink:produces':                                    { plural: 'produce',                                     singular: 'produces' },
+  'biolink:related_to':                                  { plural: 'are related to',                              singular: 'is related to' },
+  'biolink:similar_to':                                  { plural: 'are similar to',                              singular: 'is similar to' },
+  'biolink:subclass_of':                                 { plural: 'are subclasses of',                           singular: 'is a subclass of' },
+};
+
+
+interface QueryTemplate {
+  value: string;
+  example: string;
+  exampleLabel: string;
+  exampleIsTarget: boolean;
+  params?: { pvalueThreshold?: string; ruleLength?: string };
+}
+
+interface RetryTweaks {
+  predicate?: string;
+  pvalueThreshold?: string;
+  ruleLength?: string;
+  sourceCategory?: string;
+  targetCategory?: string;
+  entityId?: string;
+  entityName?: string;
+  entityIsTarget?: boolean;
+}
 
 interface QueryBuilderProps {
   onJobCreated: (jobId: string) => void;
-  onQueryPreview?: (query: any) => void; 
+  onQueryPreview?: (query: any) => void;
+  initialTemplate?: QueryTemplate | null;
+  onTemplateClear?: () => void;
+  retryTweaks?: RetryTweaks | null;
+  onRetryApplied?: () => void;
 }
 
 // Helper function to debounce
@@ -93,12 +142,63 @@ const Chip: React.FC<{ label: string; onRemove: () => void }> = ({ label, onRemo
   </span>
 );
 
-export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQueryPreview }) => {
+function pluralizeLastWord(text: string): string {
+  const words = text.split(' ');
+  let last = words[words.length - 1];
+  if (last.endsWith('y') && !/[aeiou]y$/i.test(last)) {
+    last = last.slice(0, -1) + 'ies';
+  } else if (/(?:s|x|z|ch|sh)$/i.test(last)) {
+    last = last + 'es';
+  } else {
+    last = last + 's';
+  }
+  words[words.length - 1] = last;
+  return words.join(' ');
+}
+
+function getPredicatePhrase(pred: string): { plural: string; singular: string } {
+  const entry = PREDICATE_PHRASES[pred];
+  if (entry) return entry;
+  const raw = pred.replace('biolink:', '').replace(/_/g, ' ');
+  const words = raw.split(' ');
+  const hasParticiple = words.some(w => w.endsWith('ed'));
+  return {
+    plural: hasParticiple ? `are ${raw}` : words[0].endsWith('s') && !words[0].endsWith('ss')
+      ? [words[0].slice(0, -1), ...words.slice(1)].join(' ') : raw,
+    singular: hasParticiple ? `is ${raw}` : raw,
+  };
+}
+
+export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQueryPreview, initialTemplate, onTemplateClear, retryTweaks, onRetryApplied }) => {
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
-  const [sourceCategory, setSourceCategory] = useState('biolink:Disease');
-  const [targetCategory, setTargetCategory] = useState('biolink:Drug');
+  const [sourceCategory, setSourceCategory] = useState('biolink:Drug');
+  const [targetCategory, setTargetCategory] = useState('biolink:Disease');
   const [predicate, setPredicate] = useState('biolink:treats');
+  const [predicateSearch, setPredicateSearch] = useState('');
+  const [showPredicateDropdown, setShowPredicateDropdown] = useState(false);
+
+  // Biolink association map: "Subject|Object" -> valid predicates
+  const [associationMap, setAssociationMap] = useState<Record<string, string[]> | null>(null);
+
+  useEffect(() => {
+    biolinkAPI.getAssociations()
+      .then(setAssociationMap)
+      .catch(() => setAssociationMap(null));
+  }, []);
+
+  const validPredicates = associationMap
+    ? (associationMap[`${sourceCategory}|${targetCategory}`] ?? PREDICATES)
+    : PREDICATES;
+
+  useEffect(() => {
+    if (associationMap && !validPredicates.includes(predicate)) {
+      const fallback = validPredicates.includes('biolink:related_to')
+        ? 'biolink:related_to'
+        : validPredicates[0] || 'biolink:related_to';
+      setPredicate(fallback);
+    }
+  }, [sourceCategory, targetCategory, associationMap]);
   const [aspectQualifier, setAspectQualifier] = useState('');
   const [directionQualifier, setDirectionQualifier] = useState('');
   const [speciesQualifier, setSpeciesQualifier] = useState('');
@@ -108,7 +208,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [ruleLength, setRuleLength] = useState(DEFAULT_MAX_RULES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedExample, setSelectedExample] = useState<number | null>(null);
 
   // Node types to prioritize
   const [nodesToPrioritize, setNodesToPrioritize] = useState<string[]>([]);
@@ -131,6 +230,52 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const [predicateSuggestions, setPredicateSuggestions] = useState<string[]>([]);
   const [showPredicateSuggestions, setShowPredicateSuggestions] = useState(false);
   const predicateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!initialTemplate) return;
+    const [source, pred, target] = initialTemplate.value.split('-');
+    setSourceCategory(source);
+    setPredicate(pred);
+    setTargetCategory(target);
+    if (initialTemplate.exampleIsTarget) {
+      setSourceId('');
+      setTargetId(initialTemplate.example);
+      setTargetNormalizedName(initialTemplate.exampleLabel || '');
+      setSourceNormalizedName('');
+    } else {
+      setSourceId(initialTemplate.example);
+      setTargetId('');
+      setSourceNormalizedName(initialTemplate.exampleLabel || '');
+      setTargetNormalizedName('');
+    }
+    setPvalueThreshold(initialTemplate.params?.pvalueThreshold ?? DEFAULT_PVALUE);
+    setRuleLength(initialTemplate.params?.ruleLength ?? DEFAULT_MAX_RULES);
+    onTemplateClear?.();
+  }, [initialTemplate]);
+
+  useEffect(() => {
+    if (!retryTweaks) return;
+    // Tweaks carry the full original query context, so apply everything
+    if (retryTweaks.sourceCategory) setSourceCategory(retryTweaks.sourceCategory);
+    if (retryTweaks.targetCategory) setTargetCategory(retryTweaks.targetCategory);
+    if (retryTweaks.predicate) setPredicate(retryTweaks.predicate);
+    if (retryTweaks.pvalueThreshold) setPvalueThreshold(retryTweaks.pvalueThreshold);
+    if (retryTweaks.ruleLength) setRuleLength(retryTweaks.ruleLength);
+    if (retryTweaks.entityId) {
+      if (retryTweaks.entityIsTarget) {
+        setTargetId(retryTweaks.entityId);
+        setTargetNormalizedName(retryTweaks.entityName || '');
+        setSourceId('');
+        setSourceNormalizedName('');
+      } else {
+        setSourceId(retryTweaks.entityId);
+        setSourceNormalizedName(retryTweaks.entityName || '');
+        setTargetId('');
+        setTargetNormalizedName('');
+      }
+    }
+    onRetryApplied?.();
+  }, [retryTweaks]);
 
   // Name resolution states
   const [isNormalizingSource, setIsNormalizingSource] = useState(false);
@@ -246,7 +391,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const selectSourceSuggestion = (suggestion: any) => {
     setSourceId(suggestion.curie);
     setSourceNormalizedName(suggestion.label);
-    
+    setTargetId('');
+    setTargetNormalizedName('');
+
     const types = suggestion.types || [];
     for (const type of types) {
       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
@@ -255,7 +402,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
         break;
       }
     }
-    
+
     setShowSourceDropdown(false);
     setSourceSuggestions([]);
   };
@@ -264,7 +411,9 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
   const selectTargetSuggestion = (suggestion: any) => {
     setTargetId(suggestion.curie);
     setTargetNormalizedName(suggestion.label);
-    
+    setSourceId('');
+    setSourceNormalizedName('');
+
     const types = suggestion.types || [];
     for (const type of types) {
       const biolinkType = type.startsWith('biolink:') ? type : `biolink:${type}`;
@@ -273,7 +422,7 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
         break;
       }
     }
-    
+
     setShowTargetDropdown(false);
     setTargetSuggestions([]);
   };
@@ -388,29 +537,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
     predicatesToConstrain,
   ]);
   
-  const handleExampleQuery = (exampleValue: string, exampleId: string, exampleIsTarget: boolean, idx: number) => {
-    const [source, pred, target] = exampleValue.split('-');
-    setSourceCategory(source);
-    setPredicate(pred);
-    setTargetCategory(target);
-    setSelectedExample(idx);
-
-    if (exampleIsTarget) {
-      setSourceId('');
-      setTargetId(exampleId);
-      setSourceNormalizedName('');
-      setTargetNormalizedName('');
-    } else {
-      setSourceId(exampleId);
-      setTargetId('');
-      setSourceNormalizedName('');
-      setTargetNormalizedName('');
-    }
-
-    const params = EXAMPLE_QUERIES[idx].params;
-    setPvalueThreshold(params?.pvalueThreshold ?? DEFAULT_PVALUE);
-    setRuleLength(params?.ruleLength ?? DEFAULT_MAX_RULES);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -457,72 +583,88 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
 
   return (
     <div className="space-y-6">
-      {/* Example Queries */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Lightbulb className="w-4 h-4 text-amber-500" />
-          <label className="text-sm font-semibold text-slate-700">
-            Quick Start Templates
-          </label>
-        </div>
-        <div className="grid grid-cols-1 gap-2">
-          {EXAMPLE_QUERIES.map((query, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleExampleQuery(query.value, query.example, query.exampleIsTarget, idx)}
-              className={`
-                text-left px-4 py-3 rounded-xl border-2 transition-all duration-200
-                ${selectedExample === idx 
-                  ? 'border-purple-500 bg-purple-50 shadow-sm' 
-                  : 'border-slate-200 hover:border-purple-200 hover:bg-purple-50/50'
-                }
-              `}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`font-medium ${selectedExample === idx ? 'text-purple-700' : 'text-slate-700'}`}>
-                  {query.label}
-                </span>
-                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
-                  {query.example}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">{query.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="h-px bg-purple-100" />
-
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Node Configuration */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Live query description */}
+        {(() => {
+          const { plural, singular } = getPredicatePhrase(predicate);
+          const srcCat = formatCategoryName(sourceCategory);
+          const tgtCat = formatCategoryName(targetCategory);
+          const src = sourceNormalizedName || sourceId;
+          const tgt = targetNormalizedName || targetId;
+
+          return (
+            <div className="text-center py-2.5 px-4 bg-gradient-to-r from-violet-50 via-purple-50 to-fuchsia-50 rounded-xl border border-purple-100/60">
+              <p className="text-sm text-slate-600">
+                {src && !tgt ? (
+                  <>
+                    <span className="font-semibold text-fuchsia-700">{pluralizeLastWord(tgtCat)}</span>
+                    {' '}that{' '}
+                    <span className="font-semibold text-violet-700">{src}</span>
+                    {' '}<span className="font-medium text-indigo-500 italic">{singular}</span>
+                  </>
+                ) : tgt && !src ? (
+                  <>
+                    <span className="font-semibold text-violet-700">{pluralizeLastWord(srcCat)}</span>
+                    {' '}that{' '}<span className="font-medium text-indigo-500 italic">{plural}</span>
+                    {' '}<span className="font-semibold text-fuchsia-700">{tgt}</span>
+                  </>
+                ) : src && tgt ? (
+                  <>
+                    <span className="font-semibold text-violet-700">{src}</span>
+                    {' '}<span className="font-medium text-indigo-500 italic">{singular}</span>
+                    {' '}<span className="font-semibold text-fuchsia-700">{tgt}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold text-violet-700">{pluralizeLastWord(srcCat)}</span>
+                    {' '}that{' '}<span className="font-medium text-indigo-500 italic">{plural}</span>
+                    {' '}<span className="font-semibold text-fuchsia-700">{pluralizeLastWord(tgtCat)}</span>
+                  </>
+                )}
+              </p>
+            </div>
+          );
+        })()}
+
+        {/* Source → Predicate → Target */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           {/* Source Node */}
-          <div className="space-y-3">
+          <div className={`space-y-3 transition-opacity ${targetId ? 'opacity-40' : ''}`}>
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <div className="w-2 h-2 rounded-full bg-violet-500" />
               Source Node
             </label>
-            
+
             <div className="relative">
-              <input
-                type="text"
-                value={sourceId}
-                onChange={(e) => {
-                  setSourceId(e.target.value);
-                  setSourceNormalizedName('');
-                  handleSourceSearch(e.target.value);
-                }}
-                onFocus={() => sourceId.length >= 2 && sourceSuggestions.length > 0 && setShowSourceDropdown(true)}
-                onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
-                placeholder="Type name or CURIE (e.g., Alzheimer or MONDO:0004975)"
-                className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
-              />
-              {isNormalizingSource && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
-              )}
-              
+              <div className={`flex items-center gap-2 w-full px-4 py-3 border rounded-xl transition-all ${targetId ? 'bg-slate-100 border-slate-200' : 'bg-white border-purple-100 focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500'}`}>
+                <input
+                  type="text"
+                  value={sourceId}
+                  onChange={(e) => {
+                    setSourceId(e.target.value);
+                    setSourceNormalizedName('');
+                    handleSourceSearch(e.target.value);
+                    if (e.target.value) {
+                      setTargetId('');
+                      setTargetNormalizedName('');
+                    }
+                  }}
+                  onFocus={() => sourceId.length >= 2 && sourceSuggestions.length > 0 && setShowSourceDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
+                  disabled={!!targetId}
+                  placeholder={targetId ? `Searching all ${pluralizeLastWord(formatCategoryName(sourceCategory))}` : 'e.g., Ibuprofen, CHEBI:5855'}
+                  className="flex-1 min-w-0 bg-transparent outline-none placeholder-slate-400 text-sm"
+                />
+                {sourceNormalizedName && (
+                  <span className="flex-shrink-0 text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-md truncate max-w-[45%]" title={sourceNormalizedName}>
+                    {sourceNormalizedName}
+                  </span>
+                )}
+                {isNormalizingSource && (
+                  <Loader2 className="flex-shrink-0 w-4 h-4 text-purple-500 animate-spin" />
+                )}
+              </div>
+
               {/* Autocomplete Dropdown */}
               {showSourceDropdown && sourceSuggestions.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
@@ -546,13 +688,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               )}
             </div>
             
-            {sourceNormalizedName && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                <Search className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-700 font-medium">{sourceNormalizedName}</span>
-              </div>
-            )}
-            
             <select
               value={sourceCategory}
               onChange={(e) => setSourceCategory(e.target.value)}
@@ -566,31 +701,104 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
             </select>
           </div>
 
-          {/* Target Node */}
+          {/* Relationship Predicate */}
           <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <div className="w-6 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded" />
+              Predicate
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={showPredicateDropdown ? predicateSearch : predicate.replace('biolink:', '').replace(/_/g, ' ')}
+                onChange={(e) => {
+                  setPredicateSearch(e.target.value);
+                  setShowPredicateDropdown(true);
+                }}
+                onFocus={(e) => {
+                  setPredicateSearch('');
+                  setShowPredicateDropdown(true);
+                  e.target.select();
+                }}
+                onBlur={() => setTimeout(() => {
+                  setShowPredicateDropdown(false);
+                  setPredicateSearch('');
+                }, 200)}
+                placeholder="Search predicates..."
+                className="w-full px-3 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium text-sm"
+              />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+
+              {showPredicateDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  {validPredicates
+                    .filter(p => p.replace('biolink:', '').replace(/_/g, ' ').toLowerCase().includes(predicateSearch.toLowerCase()))
+                    .map((pred, idx) => (
+                      <button
+                        key={`pred-${pred}-${idx}`}
+                        type="button"
+                        onMouseDown={() => {
+                          setPredicate(pred);
+                          if (!QUALIFIED_PREDICATES.includes(pred)) {
+                            setAspectQualifier('');
+                            setDirectionQualifier('');
+                          } else if (pred !== predicate) {
+                            setDirectionQualifier('');
+                          }
+                          setShowPredicateDropdown(false);
+                          setPredicateSearch('');
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors border-b border-purple-50 last:border-0 ${
+                          pred === predicate
+                            ? 'bg-purple-50 text-purple-700 font-semibold'
+                            : 'hover:bg-purple-50 text-slate-700'
+                        }`}
+                      >
+                        {pred.replace('biolink:', '').replace(/_/g, ' ')}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Target Node */}
+          <div className={`space-y-3 transition-opacity ${sourceId ? 'opacity-40' : ''}`}>
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <div className="w-2 h-2 rounded-full bg-fuchsia-500" />
               Target Node
             </label>
-            
+
             <div className="relative">
-              <input
-                type="text"
-                value={targetId}
-                onChange={(e) => {
-                  setTargetId(e.target.value);
-                  setTargetNormalizedName('');
-                  handleTargetSearch(e.target.value);
-                }}
-                onFocus={() => targetId.length >= 2 && targetSuggestions.length > 0 && setShowTargetDropdown(true)}
-                onBlur={() => setTimeout(() => setShowTargetDropdown(false), 200)}
-                placeholder="Type name or CURIE (e.g., dopamine or CHEBI:18243)"
-                className="w-full px-4 py-3 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder-slate-400 text-sm pr-10"
-              />
-              {isNormalizingTarget && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
-              )}
-              
+              <div className={`flex items-center gap-2 w-full px-4 py-3 border rounded-xl transition-all ${sourceId ? 'bg-slate-100 border-slate-200' : 'bg-white border-purple-100 focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500'}`}>
+                <input
+                  type="text"
+                  value={targetId}
+                  onChange={(e) => {
+                    setTargetId(e.target.value);
+                    setTargetNormalizedName('');
+                    handleTargetSearch(e.target.value);
+                    if (e.target.value) {
+                      setSourceId('');
+                      setSourceNormalizedName('');
+                    }
+                  }}
+                  onFocus={() => targetId.length >= 2 && targetSuggestions.length > 0 && setShowTargetDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowTargetDropdown(false), 200)}
+                  disabled={!!sourceId}
+                  placeholder={sourceId ? `Searching all ${pluralizeLastWord(formatCategoryName(targetCategory))}` : 'e.g., Alzheimer, MONDO:0004975'}
+                  className="flex-1 min-w-0 bg-transparent outline-none placeholder-slate-400 text-sm"
+                />
+                {targetNormalizedName && (
+                  <span className="flex-shrink-0 text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-md truncate max-w-[45%]" title={targetNormalizedName}>
+                    {targetNormalizedName}
+                  </span>
+                )}
+                {isNormalizingTarget && (
+                  <Loader2 className="flex-shrink-0 w-4 h-4 text-purple-500 animate-spin" />
+                )}
+              </div>
+
               {/* Autocomplete Dropdown */}
               {showTargetDropdown && targetSuggestions.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-purple-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
@@ -614,13 +822,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
               )}
             </div>
             
-            {targetNormalizedName && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                <Search className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-700 font-medium">{targetNormalizedName}</span>
-              </div>
-            )}
-            
             <select
               value={targetCategory}
               onChange={(e) => setTargetCategory(e.target.value)}
@@ -635,37 +836,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
           </div>
         </div>
 
-        {/* Predicate */}
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <div className="w-6 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded" />
-            Relationship Predicate
-          </label>
-          <select
-            value={predicate}
-            onChange={(e) => {
-              const newPredicate = e.target.value;
-              setPredicate(newPredicate);
-              // Clear qualifiers if switching to a non-qualified predicate
-              // or clear direction qualifier when switching between qualified predicates
-              // (since they have different valid direction options)
-              if (!QUALIFIED_PREDICATES.includes(newPredicate)) {
-                setAspectQualifier('');
-                setDirectionQualifier('');
-              } else if (newPredicate !== predicate) {
-                // Switching between affects and regulates - clear direction qualifier
-                setDirectionQualifier('');
-              }
-            }}
-            className="w-full px-4 py-3 bg-slate-50 border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-700 font-medium"
-          >
-            {PREDICATES.map((pred, idx) => (
-              <option key={`pred-${pred}-${idx}`} value={pred}>
-                {pred.replace('biolink:', '').replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
 
         {/* Qualifiers - Only show for qualified predicates (affects, regulates) */}
         {QUALIFIED_PREDICATES.includes(predicate) && (
@@ -733,31 +903,30 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onJobCreated, onQuer
             {showParameters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
-          {!showParameters && (
-            <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <div className="flex items-center gap-2 text-xs text-slate-600 mb-2">
-                <Info className="w-3 h-3" />
-                <span className="font-medium">Active Defaults:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                  {speciesQualifier ? (speciesQualifier === 'NCBITaxon:9606' ? 'Human' : speciesQualifier === 'NCBITaxon:10090' ? 'Mouse' : 'Rat') : 'All species'}
-                </span>
-                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-mono">
-                  p-value: {pvalueThreshold}
-                </span>
-                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-mono">
-                  max_rules: {ruleLength}
-                </span>
-                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
-                  Excluding {predicatesToConstrain.length} predicates
-                </span>
-              </div>
-            </div>
-          )}
-
           {showParameters && (
             <div className="mt-4 p-5 bg-purple-50/50 rounded-xl border border-purple-100 space-y-5">
+              {/* Active Defaults Summary */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 text-xs text-slate-600 mb-2">
+                  <Info className="w-3 h-3" />
+                  <span className="font-medium">Active Defaults:</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                    {speciesQualifier ? (speciesQualifier === 'NCBITaxon:9606' ? 'Human' : speciesQualifier === 'NCBITaxon:10090' ? 'Mouse' : 'Rat') : 'All species'}
+                  </span>
+                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-mono">
+                    p-value: {pvalueThreshold}
+                  </span>
+                  <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-mono">
+                    max_rules: {ruleLength}
+                  </span>
+                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
+                    Excluding {predicatesToConstrain.length} predicates
+                  </span>
+                </div>
+              </div>
+
               {/* Basic Parameters Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">

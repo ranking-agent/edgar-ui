@@ -18,6 +18,7 @@ interface Job {
   status: string;
   progress: number;
   message: string;
+  query_summary?: string;
   created_at: string;
   completed_at?: string;
 }
@@ -190,8 +191,8 @@ export const JobHistory: React.FC<JobHistoryProps> = ({ onSelectJob }) => {
                     {/* Job Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        <span className="font-mono text-sm font-semibold text-slate-900">
-                          {job.job_id.substring(0, 12)}...
+                        <span className="text-sm font-semibold text-slate-900">
+                          {job.query_summary || job.job_id.substring(0, 12) + '...'}
                         </span>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
                           {config.label}

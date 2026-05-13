@@ -14,6 +14,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.neo4j import init_neo4j, close_neo4j
 from app.db.redis import init_redis, close_redis
+from app.services.biolink_service import biolink_service
 
 # Configure structured logging
 structlog.configure(
@@ -82,6 +83,7 @@ async def startup_event():
     logger.info("Starting EDGAR API")
     await init_neo4j()
     await init_redis()
+    biolink_service.build_associations()
     logger.info("EDGAR API started successfully")
 
 
